@@ -1,4 +1,8 @@
 //! A nix package documentation search program
+mod threadpool;
+
+use crate::threadpool::ThreadPool;
+
 use colorful::Colorful;
 use regex::Regex;
 use rnix::types::{AttrSet, EntryHolder, Ident, Lambda, TokenWrapper, TypedNode};
@@ -9,6 +13,7 @@ use walkdir::WalkDir;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::sync::mpsc::channel;
 use std::{fmt::Display, str};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -33,14 +38,14 @@ fn find_line(file: &str, pos: usize) -> usize {
 }
 
 impl SearchResult {
-    fn print<P: Display>(&self, filename: P, file: &str) {
-        println!(
+    fn format<P: Display>(&self, filename: P, file: &str) -> String {
+        format!(
             "{}\n{}  {}:{}\n",
             indented(&self.doc, DOC_INDENT),
             self.identifier.as_str().white().bold(),
             filename,
             find_line(file, self.defined_at_start)
-        );
+        )
     }
 }
 
@@ -58,26 +63,45 @@ fn search_file(file: &Path, matching: &Regex) -> Result<(Vec<SearchResult>, Stri
 }
 
 /// Search the `dir` for files with function definitions matching `matching`
-fn search<F>(dir: &Path, matching: &Regex, should_search: F)
+fn search<F>(dir: &Path, matching: Regex, should_search: F)
 where
     F: Fn(&Path) -> bool,
 {
+    let pool = ThreadPool::new(4);
+    let (tx, rx) = channel();
+
     //println!("searching {}", dir.display());
     for direntry in WalkDir::new(dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| should_search(e.path()) && e.path().is_file())
     {
-        //println!("{}", direntry.path().display());
-        let results = search_file(direntry.path(), matching);
-        if let Err(err) = results {
-            eprintln!("Failure handling {}: {}", direntry.path().display(), err);
-            continue;
-        }
-        let (results, file_content) = results.unwrap();
+        let my_tx = tx.clone();
+        let matching = matching.clone();
+        pool.push(move || {
+            //println!("{}", direntry.path().display());
+            let results = search_file(direntry.path(), &matching);
+            if let Err(err) = results {
+                eprintln!("Failure handling {}: {}", direntry.path().display(), err);
+                return;
+            }
+            let (results, file_content) = results.unwrap();
 
+            let formatted = results
+                .iter()
+                .map(|result| result.format(direntry.path().display(), &file_content))
+                .collect::<Vec<_>>();
+            if formatted.len() > 0 {
+                assert!(my_tx.send(formatted).is_ok());
+            }
+        });
+    }
+
+    pool.done();
+
+    while let Ok(results) = rx.recv() {
         for result in results {
-            result.print(direntry.path().display(), &file_content);
+            println!("{}", result);
         }
     }
 }
@@ -190,7 +214,7 @@ fn main() -> Result<()> {
 
     let re_match = re_match.unwrap();
     let re_match = Regex::new(&re_match)?;
-    search(&Path::new(&file), &re_match, is_searchable);
+    search(&Path::new(&file), re_match, is_searchable);
     Ok(())
 }
 
