@@ -20,6 +20,11 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 const DOC_INDENT: usize = 3;
 
+/// Max size of files we will consider searching. It takes a long time to parse 300k lines of nix
+/// in hackage-packages.nix and no files this big will have search results in them as they
+/// categorically do not contain functions. 200k bytes is ~7.5k lines
+const MAX_FILE_SIZE: u64 = 200_000;
+
 struct SearchResult {
     /// Name of the function
     identifier: String,
@@ -57,6 +62,12 @@ fn is_searchable(fname: &Path) -> bool {
 /// Runs a search for files matching the regex `matching`. Returns a list of such results with the
 /// associated file contents
 fn search_file(file: &Path, matching: &Regex) -> Result<Vec<(SearchResult, usize)>> {
+    // don't bother searching files that are so large they must be generated
+    let length = fs::metadata(file)?.len();
+    if length > MAX_FILE_SIZE {
+        return Ok(Vec::new());
+    }
+
     let content = fs::read_to_string(file)?;
     let ast = rnix::parse(&content).as_result()?;
     let results = search_ast(&matching, &ast);
@@ -167,9 +178,8 @@ fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &m
                 .trim()
                 .split("\n")
                 .map(|line| {
-                    line
-                        // leading whitespace
-                        .trim_start_matches(|c: char| c.is_whitespace() || c == '#')
+                    // leading whitespace + single line comments
+                    line.trim_start_matches(|c: char| c.is_whitespace() || c == '#')
                 })
                 .collect::<Vec<_>>()
                 .join("\n")
@@ -194,7 +204,6 @@ fn visit_attrset(id_needle: &Regex, set: &AttrSet) -> Vec<SearchResult> {
                     // rejected, not matching our pattern
                     continue;
                 }
-
                 let ident_name = ident_name.unwrap();
 
                 if let Some(comment) = find_comment(attr.node().clone()) {
@@ -205,28 +214,13 @@ fn visit_attrset(id_needle: &Regex, set: &AttrSet) -> Vec<SearchResult> {
                     });
                 } else {
                     // ignore results without comments, they are probably reexports or
-                    // modifications
+                    // wrappers
                     continue;
                 }
             }
         }
     }
     results
-}
-
-fn main() -> Result<()> {
-    let mut args = env::args().skip(1);
-    let re_match = args.next();
-    let file = args.next().unwrap_or(".".to_string());
-    if re_match.is_none() {
-        eprintln!("Usage: list-fns <file>");
-        return Ok(());
-    }
-
-    let re_match = re_match.unwrap();
-    let re_match = Regex::new(&re_match)?;
-    search(&Path::new(&file), re_match, is_searchable);
-    Ok(())
 }
 
 fn find_comment(node: SyntaxNode) -> Option<String> {
@@ -255,6 +249,21 @@ fn find_comment(node: SyntaxNode) -> Option<String> {
     return Some(doc).filter(|it| !it.is_empty());
 }
 
+fn main() -> Result<()> {
+    let mut args = env::args().skip(1);
+    let re_match = args.next();
+    let file = args.next().unwrap_or(".".to_string());
+    if re_match.is_none() {
+        eprintln!("Usage: nix-doc SearchRegex [Directory]");
+        return Ok(());
+    }
+
+    let re_match = re_match.unwrap();
+    let re_match = Regex::new(&re_match)?;
+    search(&Path::new(&file), re_match, is_searchable);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,7 +273,7 @@ mod tests {
         let ex1 = ["/* blah blah blah\n      foooo baaar\n */"];
         assert_eq!(
             cleanup_comments(&mut ex1.iter()),
-            "blah blah blah\nfoooo baaar\n"
+            "blah blah blah\nfoooo baaar"
         );
 
         let ex2 = ["# a1", "#    a2", "# aa"];
