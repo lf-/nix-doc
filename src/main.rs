@@ -92,11 +92,14 @@ where
                 .map(|result| result.format(direntry.path().display(), &file_content))
                 .collect::<Vec<_>>();
             if formatted.len() > 0 {
-                assert!(my_tx.send(formatted).is_ok());
+                my_tx
+                    .send(formatted)
+                    .expect("failed to send messages to display");
             }
         });
     }
 
+    drop(tx);
     pool.done();
 
     while let Ok(results) = rx.recv() {
