@@ -18,8 +18,6 @@ use std::{fmt::Display, str};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-/// Only search files which have lib in their names
-const SEARCH_FILES_PAT: &str = "lib";
 const DOC_INDENT: usize = 3;
 
 struct SearchResult {
@@ -38,28 +36,38 @@ fn find_line(file: &str, pos: usize) -> usize {
 }
 
 impl SearchResult {
-    fn format<P: Display>(&self, filename: P, file: &str) -> String {
+    fn format<P: Display>(&self, filename: P, line: usize) -> String {
         format!(
-            "{}\n{}  {}:{}\n",
+            "\n{}\n{}:{}  {}",
             indented(&self.doc, DOC_INDENT),
-            self.identifier.as_str().white().bold(),
             filename,
-            find_line(file, self.defined_at_start)
+            line,
+            self.identifier.as_str().white().bold()
         )
     }
 }
 
 /// Should the given path be searched?
+/// TODO: support globbing for files e.g. with lib in their name to improve perf significantly
+///       or avoid looking in absurdly large files like hackage.nix
 fn is_searchable(fname: &Path) -> bool {
-    // XXX: we should check from the base of the nixpkgs tree since the `lib` filename heuristic
-    // breaks down if the entire nixpkgs is below some folder called `lib`.
     fname.to_str().map(|s| s.ends_with(".nix")).unwrap_or(false)
 }
 
-fn search_file(file: &Path, matching: &Regex) -> Result<(Vec<SearchResult>, String)> {
+/// Runs a search for files matching the regex `matching`. Returns a list of such results with the
+/// associated file contents
+fn search_file(file: &Path, matching: &Regex) -> Result<Vec<(SearchResult, usize)>> {
     let content = fs::read_to_string(file)?;
     let ast = rnix::parse(&content).as_result()?;
-    Ok((search_ast(&matching, &ast), content))
+    let results = search_ast(&matching, &ast);
+
+    Ok(results
+        .into_iter()
+        .map(|res| {
+            let line = find_line(&content, res.defined_at_start);
+            (res, line)
+        })
+        .collect::<Vec<_>>())
 }
 
 /// Search the `dir` for files with function definitions matching `matching`
@@ -67,7 +75,7 @@ fn search<F>(dir: &Path, matching: Regex, should_search: F)
 where
     F: Fn(&Path) -> bool,
 {
-    let pool = ThreadPool::new(4);
+    let pool = ThreadPool::new();
     let (tx, rx) = channel();
 
     //println!("searching {}", dir.display());
@@ -85,11 +93,11 @@ where
                 eprintln!("Failure handling {}: {}", direntry.path().display(), err);
                 return;
             }
-            let (results, file_content) = results.unwrap();
+            let results = results.unwrap();
 
             let formatted = results
                 .iter()
-                .map(|result| result.format(direntry.path().display(), &file_content))
+                .map(|(result, line)| result.format(direntry.path().display(), *line))
                 .collect::<Vec<_>>();
             if formatted.len() > 0 {
                 my_tx
@@ -147,21 +155,21 @@ fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &m
         .map(|comment| {
             comment
                 .as_ref()
+                // space before multiline start
+                .trim_start()
+                // multiline starts
+                .trim_start_matches("/*")
+                // trailing so we can grab multiline end
+                .trim_end()
+                // multiline ends
+                .trim_end_matches("*/")
+                // extra space that was in the multiline
+                .trim()
                 .split("\n")
                 .map(|line| {
                     line
                         // leading whitespace
                         .trim_start_matches(|c: char| c.is_whitespace() || c == '#')
-                        // multiline starts
-                        .trim_start_matches("/*")
-                        // whitespace after multiline starts
-                        .trim()
-                        // whitespace after multiline ends
-                        .trim_end()
-                        // multiline ends
-                        .trim_end_matches("*/")
-                        // trailing
-                        .trim_end()
                 })
                 .collect::<Vec<_>>()
                 .join("\n")
