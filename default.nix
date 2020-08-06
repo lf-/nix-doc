@@ -1,7 +1,7 @@
 { nixpkgs ? import <nixpkgs> { } }:
 nixpkgs.rustPlatform.buildRustPackage {
   pname   = "nix-doc";
-  version = "0.2.1";
+  version = "0.2.2";
 
   src = builtins.fetchGit ./.;
 

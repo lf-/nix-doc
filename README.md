@@ -7,7 +7,7 @@ A Nix documentation search tool.
 ```
 $ nix-env -i -f ./default.nix
 # or if you don't want to use nix,
-$ cargo install --path .
+$ cargo install nix-doc
 ```
 
 ## Usage
