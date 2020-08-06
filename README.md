@@ -2,6 +2,14 @@
 
 A Nix documentation search tool.
 
+## Setup
+
+```
+$ nix-env -i -f ./default.nix
+# or if you don't want to use nix,
+$ cargo install --path .
+```
+
 ## Usage
 
 ```

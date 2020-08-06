@@ -3,13 +3,8 @@ authors = ["lf- <lf-@users.noreply.github.com>"]
 description = "Nix documentation grepping tool"
 edition = "2018"
 name = "nix-doc"
-version = "0.2.0"
-
-default-run = "nix-doc"
-
-[[bin]]
-name = "nix-doc-debug"
-path = "src/debug/main.rs"
+version = "0.2.1"
+license = "LGPL-3.0-or-later"
 
 [dependencies]
 rnix = "0.8.0"
