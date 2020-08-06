@@ -1,4 +1,4 @@
-#{parm1, parm2}:
+{parm1, parm2}:
 {
   /* This is a function blah blah
      with a long ass doc comment

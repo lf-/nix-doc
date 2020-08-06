@@ -5,9 +5,16 @@ edition = "2018"
 name = "nix-doc"
 version = "0.1.0"
 
+default-run = "nix-doc"
+
+[[bin]]
+name = "nix-doc-debug"
+path = "src/debug/main.rs"
+
 [dependencies]
 rnix = "0.8.0"
 walkdir = "2.3.1"
 regex = "1.3.9"
 colorful = "0.2.1"
 num_cpus = "1.13.0"
+textwrap = "0.12.1"

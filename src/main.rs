@@ -1,9 +1,8 @@
-//! A nix package documentation search program
-mod threadpool;
+//! A nix documentation search program
+use nix_doc::pprint::pprint_args;
+use nix_doc::threadpool::ThreadPool;
 
-use crate::threadpool::ThreadPool;
-
-use colorful::Colorful;
+use colorful::{Color, Colorful};
 use regex::Regex;
 use rnix::types::{AttrSet, EntryHolder, Ident, Lambda, TokenWrapper, TypedNode};
 use rnix::SyntaxKind::*;
@@ -12,6 +11,7 @@ use walkdir::WalkDir;
 
 use std::env;
 use std::fs;
+use std::iter;
 use std::path::Path;
 use std::sync::mpsc::channel;
 use std::{fmt::Display, str};
@@ -32,6 +32,9 @@ struct SearchResult {
     /// Dedented documentation comments
     doc: String,
 
+    /// Parameter block for the function
+    param_block: String,
+
     /// Start of the definition of the function
     defined_at_start: usize,
 }
@@ -43,11 +46,11 @@ fn find_line(file: &str, pos: usize) -> usize {
 impl SearchResult {
     fn format<P: Display>(&self, filename: P, line: usize) -> String {
         format!(
-            "\n{}\n{}:{}  {}",
+            "{}\n{} = {}\n# {}",
             indented(&self.doc, DOC_INDENT),
-            filename,
-            line,
-            self.identifier.as_str().white().bold()
+            self.identifier.as_str().white().bold(),
+            self.param_block,
+            format!("{}:{}", filename, line).as_str(),
         )
     }
 }
@@ -121,8 +124,19 @@ where
     drop(tx);
     pool.done();
 
+    let line = iter::repeat("─")
+        .take(45)
+        .collect::<String>()
+        .color(Color::Grey27);
+    let mut is_first = true;
+
     while let Ok(results) = rx.recv() {
         for result in results {
+            if !is_first {
+                println!("{}", &line);
+            } else {
+                is_first = false;
+            }
             println!("{}", result);
         }
     }
@@ -149,7 +163,7 @@ fn search_ast(identifier: &Regex, ast: &AST) -> Vec<SearchResult> {
 
 /// Emits a string `s` indented by `indent` spaces
 fn indented(s: &str, indent: usize) -> String {
-    let indent_s = std::iter::repeat(' ').take(indent).collect::<String>();
+    let indent_s = iter::repeat(' ').take(indent).collect::<String>();
     s.split('\n')
         .map(|line| indent_s.clone() + line)
         .collect::<Vec<_>>()
@@ -161,37 +175,40 @@ fn indented(s: &str, indent: usize) -> String {
 /// Oversight we are choosing to ignore: if you put # characters at the beginning of lines in a
 /// multiline comment, they will be deleted.
 fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &mut I) -> String {
-    comment
-        .rev()
-        .map(|comment| {
-            comment
-                .as_ref()
-                // space before multiline start
-                .trim_start()
-                // multiline starts
-                .trim_start_matches("/*")
-                // trailing so we can grab multiline end
-                .trim_end()
-                // multiline ends
-                .trim_end_matches("*/")
-                // extra space that was in the multiline
-                .trim()
-                .split("\n")
-                .map(|line| {
-                    // leading whitespace + single line comments
-                    line.trim_start_matches(|c: char| c.is_whitespace() || c == '#')
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+    textwrap::dedent(
+        &comment
+            .rev()
+            .map(|small_comment| {
+                small_comment
+                    .as_ref()
+                    // space before multiline start
+                    .trim_start()
+                    // multiline starts
+                    .trim_start_matches("/*")
+                    // trailing so we can grab multiline end
+                    .trim_end()
+                    // multiline ends
+                    .trim_end_matches("*/")
+                    // extra space that was in the multiline
+                    .trim()
+                    .split("\n")
+                    .map(|line| {
+                        // leading whitespace + single line comments
+                        line.trim_start_matches(|c: char| c.is_whitespace())
+                            .trim_start_matches(|c: char| c == '#' || c == '*')
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+    )
 }
 
 fn visit_attrset(id_needle: &Regex, set: &AttrSet) -> Vec<SearchResult> {
     let mut results = Vec::new();
     for entry in set.entries() {
-        if let Some(_) = entry.value().and_then(Lambda::cast) {
+        if let Some(lambda) = entry.value().and_then(Lambda::cast) {
             if let Some(attr) = entry.key() {
                 let ident = attr.path().last().and_then(Ident::cast);
                 let defined_at_start = ident
@@ -206,10 +223,16 @@ fn visit_attrset(id_needle: &Regex, set: &AttrSet) -> Vec<SearchResult> {
                 }
                 let ident_name = ident_name.unwrap();
 
+                // we now know it is a function we are looking for
+                // grab the arguments
+                let param_block = pprint_args(&lambda);
+
+                // find the doc comment
                 if let Some(comment) = find_comment(attr.node().clone()) {
                     results.push(SearchResult {
                         identifier: ident_name.to_string(),
                         doc: comment,
+                        param_block,
                         defined_at_start: defined_at_start.unwrap(),
                     });
                 } else {
