@@ -300,6 +300,6 @@ mod tests {
         );
 
         let ex2 = ["# a1", "#    a2", "# aa"];
-        assert_eq!(cleanup_comments(&mut ex2.iter()), "aa\na2\na1");
+        assert_eq!(cleanup_comments(&mut ex2.iter()), "aa\n   a2\na1");
     }
 }

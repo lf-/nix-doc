@@ -3,7 +3,7 @@ authors = ["lf- <lf-@users.noreply.github.com>"]
 description = "Nix documentation grepping tool"
 edition = "2018"
 name = "nix-doc"
-version = "0.1.0"
+version = "0.2.0"
 
 default-run = "nix-doc"
 
