@@ -7,7 +7,7 @@ use regex::Regex;
 use rnix::types::{AttrSet, EntryHolder, Ident, Lambda, TokenWrapper, TypedNode};
 use rnix::SyntaxKind::*;
 use rnix::{NodeOrToken, SyntaxNode, WalkEvent, AST};
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 use std::env;
 use std::fs;
@@ -84,6 +84,16 @@ fn search_file(file: &Path, matching: &Regex) -> Result<Vec<(SearchResult, usize
         .collect::<Vec<_>>())
 }
 
+/// Is a file hidden or a unicode decode error?
+/// Let's not consider it.
+fn is_hidden(entry: &DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| s != "." && s.starts_with('.'))
+        .unwrap_or(true)
+}
+
 /// Search the `dir` for files with function definitions matching `matching`
 fn search<F>(dir: &Path, matching: Regex, should_search: F)
 where
@@ -95,6 +105,7 @@ where
     //println!("searching {}", dir.display());
     for direntry in WalkDir::new(dir)
         .into_iter()
+        .filter_entry(|e| !is_hidden(e))
         .filter_map(|e| e.ok())
         .filter(|e| should_search(e.path()) && e.path().is_file())
     {
