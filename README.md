@@ -12,7 +12,6 @@ Example output:
 
 ```
 nixpkgs$ nix-doc callPackage
-
    Call the package function in the file `fn' with the required
    arguments automatically.  The function is called with the
    arguments `args', but any missing arguments are obtained from
@@ -33,19 +32,25 @@ nixpkgs$ nix-doc callPackage
    libfoo = null;
    enableX11 = true;
    };
-./lib/customisation.nix:117  callPackageWith
-
+callPackageWith = autoArgs: fn: args: ...
+# ./lib/customisation.nix:117
+─────────────────────────────────────────────
    Like callPackage, but for a function that returns an attribute
    set of derivations. The override function is added to the
    individual attributes.
-./lib/customisation.nix:127  callPackagesWith
-
+callPackagesWith = autoArgs: fn: args: ...
+# ./lib/customisation.nix:127
+─────────────────────────────────────────────
    Similar to callPackageWith/callPackage, but without makeOverridable
-./pkgs/development/beam-modules/lib.nix:7  callPackageWith
+callPackageWith = autoArgs: fn: args: ...
+# ./pkgs/development/beam-modules/lib.nix:7
 ```
 
 ## TODO
 
-* Print arguments to functions (requires implementing an rnix pretty-printer)
 * Generate tags files/otherwise generate a database file to speed up result
-  generation
+  generation.
+* Use Nix itself with builtins.unsafeGetAttrPos to find our functions for us,
+  but we handle pulling out the docs. (requires a fair refactor)
+* Fix the dedent again. We are eating indents we should not be eating e.g. in
+  the example above.
