@@ -62,3 +62,8 @@ callPackageWith = autoArgs: fn: args: ...
   but we handle pulling out the docs. (requires a fair refactor)
 * Fix the dedent again. We are eating indents we should not be eating e.g. in
   the example above.
+
+## Project information
+
+Everyone is expected to follow the [code of conduct](./CODE_OF_CONDUCT.md)
+while participating in this project.
