@@ -5,7 +5,7 @@ nixpkgs.rustPlatform.buildRustPackage {
 
   src = builtins.fetchGit ./.;
 
-  cargoSha256 = "1n6kc82bisibkjkalc9q5fb4nq6x8a2y210x0s9fdcld1cl3x9a5";
+  cargoSha256 = "0sbybqr8g9bn1nrsm2azlyw0cp9bx2yz9lhanymw5cx9c1hpam5d";
 
   meta = with nixpkgs.stdenv.lib; {
     description = "A source-based Nix documentation tool";
