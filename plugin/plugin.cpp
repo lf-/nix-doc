@@ -19,13 +19,13 @@ char const * nd_get_function_docs(char const * filename, size_t line, size_t col
 void nd_free_string(char const * str);
 }
 
-/* Return position information of the given lambda. */
+/* Print documentation of the given lambda. */
 void prim_getDoc(EvalState & state, const nix::Pos & pos, Value * * args, Value & v)
 {
     /* ensure the argument is a function */
     state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda) {
-        throwTypeError("value is %1% while a lambda was expected", *args[0], pos);
+        throwTypeError("%2%: value is %1% while a lambda was expected", *args[0], pos);
     }
 
     auto poz = args[0]->lambda.fun->pos;
@@ -40,13 +40,13 @@ void prim_getDoc(EvalState & state, const nix::Pos & pos, Value * * args, Value 
     }
 }
 
-/* Return position information of the given lambda. */
+/* Return documentation of the given lambda. */
 void prim_printDoc(EvalState & state, const nix::Pos & pos, Value * * args, Value & v)
 {
     /* ensure the argument is a function */
     state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda) {
-        throwTypeError("value is %1% while a lambda was expected", *args[0], pos);
+        throwTypeError("%2%: value is %1% while a lambda was expected", *args[0], pos);
     }
 
     auto poz = args[0]->lambda.fun->pos;
@@ -59,5 +59,18 @@ void prim_printDoc(EvalState & state, const nix::Pos & pos, Value * * args, Valu
     }
 }
 
+/* Return position information of the given lambda. */
+void prim_unsafeGetLambdaPos(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    /* ensure the argument is a function */
+    state.forceValue(*args[0], pos);
+    if (args[0]->type != tLambda) {
+        throwTypeError("%2%: value is %1% while a lambda was expected", *args[0], pos);
+    }
+
+    state.mkPos(v, &args[0]->lambda.fun->pos);
+}
+
 static RegisterPrimOp rp1("__getDoc", 1, prim_getDoc);
 static RegisterPrimOp rp2("__doc", 1, prim_printDoc);
+static RegisterPrimOp rp3("__unsafeGetLambdaPos", 1, prim_unsafeGetLambdaPos);

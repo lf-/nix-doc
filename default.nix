@@ -5,6 +5,12 @@ nixpkgs.rustPlatform.buildRustPackage {
 
   src = builtins.fetchGit ./.;
 
+  nativeBuildInputs = with nixpkgs; [
+    boost
+    nix
+    pkg-config
+  ];
+
   cargoSha256 = "1n6kc82bisibkjkalc9q5fb4nq6x8a2y210x0s9fdcld1cl3x9a5";
 
   meta = with nixpkgs.stdenv.lib; {
