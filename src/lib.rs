@@ -237,6 +237,8 @@ fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &m
     )
 }
 
+/// Get the docs for a function in the given file path at the given file position and return it as
+/// a C string pointer
 #[no_mangle]
 extern "C" fn nd_get_function_docs(
     filename: *const c_char,
@@ -259,6 +261,15 @@ extern "C" fn nd_get_function_docs(
         .and_then(|s| CString::new(s).ok())
         .map(|s| s.into_raw() as *const c_char)
         .unwrap_or(ptr::null())
+}
+
+/// Call this to free a string from nd_get_function_docs
+#[no_mangle]
+extern "C" fn nd_free_string(s: *const c_char) {
+    unsafe {
+        // this is maybe UB, but it is immediately dropped.
+        CString::from_raw(s as *mut c_char);
+    }
 }
 
 /// Get the docs for a specific function
