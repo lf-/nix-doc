@@ -27,12 +27,14 @@ struct Worker {
     thread: Option<JoinHandle<()>>,
 }
 
-impl ThreadPool {
+impl Default for ThreadPool {
     /// Creates a new ThreadPool with the number of physical+logical threads the computer has.
-    pub fn new() -> ThreadPool {
+    fn default() -> ThreadPool {
         Self::with_threads(num_cpus::get())
     }
+}
 
+impl ThreadPool {
     /// Makes a new ThreadPool with `nthreads` threads.
     pub fn with_threads(nthreads: usize) -> ThreadPool {
         assert!(nthreads > 0);
@@ -67,7 +69,9 @@ impl ThreadPool {
 impl Drop for ThreadPool {
     fn drop(&mut self) {
         for worker in self.workers.iter_mut() {
-            worker.thread.take().map(|thread| thread.join().unwrap());
+            if let Some(thread) = worker.thread.take() {
+                thread.join().unwrap();
+            }
         }
     }
 }

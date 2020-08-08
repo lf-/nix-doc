@@ -9,12 +9,16 @@ use colorful::{Color, Colorful};
 use regex::Regex;
 use rnix::types::{AttrSet, EntryHolder, Ident, Lambda, TokenWrapper, TypedNode};
 use rnix::SyntaxKind::*;
-use rnix::{NodeOrToken, SyntaxNode, WalkEvent, AST};
+use rnix::{NodeOrToken, SyntaxNode, TextUnit, WalkEvent, AST};
 use walkdir::{DirEntry, WalkDir};
 
+use std::ffi::{CStr, CString};
 use std::fs;
 use std::iter;
+use std::os::raw::c_char;
+use std::panic;
 use std::path::Path;
+use std::ptr;
 use std::sync::mpsc::channel;
 use std::{fmt::Display, str};
 
@@ -43,6 +47,21 @@ struct SearchResult {
 
 fn find_line(file: &str, pos: usize) -> usize {
     file[..pos].lines().count()
+}
+
+fn find_pos(file: &str, line: usize, col: usize) -> usize {
+    let mut lines = 1;
+    let mut line_start = 0;
+    for (count, ch) in file.chars().enumerate() {
+        if ch == '\n' {
+            lines += 1;
+            line_start = count;
+        }
+        if lines == line && count - line_start == col {
+            return count;
+        }
+    }
+    unreachable!();
 }
 
 impl SearchResult {
@@ -88,11 +107,11 @@ fn search_file(file: &Path, matching: &Regex) -> Result<Vec<(SearchResult, usize
 
 /// Is a file hidden or a unicode decode error?
 /// Let's not consider it.
-fn is_hidden(entry: &DirEntry) -> bool {
+fn is_ignored(entry: &DirEntry) -> bool {
     entry
         .file_name()
         .to_str()
-        .map(|s| s != "." && s.starts_with('.'))
+        .map(|s| s != "." && s.starts_with('.') || s == "target")
         .unwrap_or(true)
 }
 
@@ -101,13 +120,13 @@ pub fn search<F>(dir: &Path, matching: Regex, should_search: F)
 where
     F: Fn(&Path) -> bool,
 {
-    let pool = ThreadPool::new();
+    let pool = ThreadPool::default();
     let (tx, rx) = channel();
 
     //println!("searching {}", dir.display());
     for direntry in WalkDir::new(dir)
         .into_iter()
-        .filter_entry(|e| !is_hidden(e))
+        .filter_entry(|e| !is_ignored(e))
         .filter_map(|e| e.ok())
         .filter(|e| should_search(e.path()) && e.path().is_file())
     {
@@ -126,7 +145,7 @@ where
                 .iter()
                 .map(|(result, line)| result.format(direntry.path().display(), *line))
                 .collect::<Vec<_>>();
-            if formatted.len() > 0 {
+            if !formatted.is_empty() {
                 my_tx
                     .send(formatted)
                     .expect("failed to send messages to display");
@@ -162,7 +181,7 @@ fn search_ast(identifier: &Regex, ast: &AST) -> Vec<SearchResult> {
         match ev {
             WalkEvent::Enter(enter) => {
                 //println!("enter {:?}", &enter);
-                if let Some(set) = enter.into_node().and_then(|elem| AttrSet::cast(elem)) {
+                if let Some(set) = enter.into_node().and_then(AttrSet::cast) {
                     results.extend(visit_attrset(identifier, &set));
                 }
             }
@@ -204,7 +223,7 @@ fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &m
                     .trim_end_matches("*/")
                     // extra space that was in the multiline
                     .trim()
-                    .split("\n")
+                    .split('\n')
                     .map(|line| {
                         // leading whitespace + single line comments
                         line.trim_start_matches(|c: char| c.is_whitespace())
@@ -216,6 +235,70 @@ fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &m
             .collect::<Vec<_>>()
             .join("\n"),
     )
+}
+
+#[no_mangle]
+extern "C" fn nd_get_function_docs(
+    filename: *const c_char,
+    line: usize,
+    col: usize,
+) -> *const c_char {
+    let fname = unsafe { CStr::from_ptr(filename) };
+    fname
+        .to_str()
+        .ok()
+        .and_then(|f| {
+            panic::catch_unwind(|| get_function_docs(f, line, col))
+                .map_err(|e| {
+                    eprintln!("panic!! {:#?}", e);
+                    e
+                })
+                .ok()
+        })
+        .flatten()
+        .and_then(|s| CString::new(s).ok())
+        .map(|s| s.into_raw() as *const c_char)
+        .unwrap_or(ptr::null())
+}
+
+/// Get the docs for a specific function
+fn get_function_docs(filename: &str, line: usize, col: usize) -> Option<String> {
+    let content = fs::read(filename).ok()?;
+    let decoded = str::from_utf8(&content).ok()?;
+    let pos = find_pos(&decoded, line, col);
+    let rowan_pos = TextUnit::from_usize(pos);
+    let tree = rnix::parse(decoded);
+
+    let mut lambda = None;
+    for node in tree.node().preorder() {
+        match node {
+            WalkEvent::Enter(n) => {
+                if n.text_range().start() >= rowan_pos && n.kind() == NODE_LAMBDA {
+                    lambda = Lambda::cast(n);
+                    break;
+                }
+            }
+            WalkEvent::Leave(_) => (),
+        }
+    }
+    let lambda = lambda?;
+    let res = visit_lambda("func".to_string(), pos, &lambda);
+    Some(res.format(filename, line))
+}
+
+fn visit_lambda(name: String, defined_at_start: usize, lambda: &Lambda) -> SearchResult {
+    // grab the arguments
+    let param_block = pprint_args(&lambda);
+
+    // find the doc comment
+    let comment = find_comment(lambda.node().clone()).unwrap_or_else(|| "".to_string());
+
+    SearchResult {
+        identifier: name,
+        doc: comment,
+        param_block,
+        defined_at_start,
+    }
 }
 
 fn visit_attrset(id_needle: &Regex, set: &AttrSet) -> Vec<SearchResult> {
@@ -236,22 +319,9 @@ fn visit_attrset(id_needle: &Regex, set: &AttrSet) -> Vec<SearchResult> {
                 }
                 let ident_name = ident_name.unwrap();
 
-                // we now know it is a function we are looking for
-                // grab the arguments
-                let param_block = pprint_args(&lambda);
-
-                // find the doc comment
-                if let Some(comment) = find_comment(attr.node().clone()) {
-                    results.push(SearchResult {
-                        identifier: ident_name.to_string(),
-                        doc: comment,
-                        param_block,
-                        defined_at_start: defined_at_start.unwrap(),
-                    });
-                } else {
-                    // ignore results without comments, they are probably reexports or
-                    // wrappers
-                    continue;
+                let res = visit_lambda(ident_name.to_string(), defined_at_start.unwrap(), &lambda);
+                if !res.doc.is_empty() {
+                    results.push(res);
                 }
             }
         }
@@ -277,17 +347,26 @@ fn find_comment(node: SyntaxNode) -> Option<String> {
                 NodeOrToken::Token(token) => comments.push(token.text().clone()),
                 NodeOrToken::Node(_) => unreachable!(),
             },
+            // This stuff is found as part of `the-fn = f: ...`
+            // here:                           ^^^^^^^^
+            NODE_IDENT | NODE_KEY | NODE_KEY_VALUE | TOKEN_IDENT | TOKEN_ASSIGN => (),
             t if t.is_trivia() => (),
             _ => break,
         }
     }
     let doc = cleanup_comments(&mut comments.iter().map(|c| c.as_str()));
-    return Some(doc).filter(|it| !it.is_empty());
+    Some(doc).filter(|it| !it.is_empty())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_bytepos() {
+        let fakefile = "abc\ndef\nghi";
+        assert_eq!(find_pos(fakefile, 2, 2), 5);
+    }
 
     #[test]
     fn test_comment_stripping() {

@@ -10,7 +10,7 @@ use std::path::Path;
 fn main() -> Result<()> {
     let mut args = env::args().skip(1);
     let re_match = args.next();
-    let file = args.next().unwrap_or(".".to_string());
+    let file = args.next().unwrap_or_else(|| ".".to_string());
     if re_match.is_none() {
         eprintln!("Usage: nix-doc SearchRegex [Directory]");
         return Ok(());
