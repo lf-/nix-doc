@@ -1,9 +1,18 @@
 { nixpkgs ? import <nixpkgs> { } }:
+let
+  gitignoreSrc = nixpkgs.fetchFromGitHub {
+      owner = "hercules-ci";
+      repo = "gitignore";
+      rev = "647d0821b590ee96056f4593640534542d8700e5";
+      sha256 = "sha256:0ks37vclz2jww9q0fvkk9jyhscw0ial8yx2fpakra994dm12yy1d";
+    };
+  inherit (import gitignoreSrc { inherit (nixpkgs) lib; }) gitignoreSource;
+in
 nixpkgs.rustPlatform.buildRustPackage {
   pname   = "nix-doc";
-  version = "0.2.2";
+  version = "0.3.0";
 
-  src = builtins.fetchGit ./.;
+  src = gitignoreSource ./.;
 
   nativeBuildInputs = with nixpkgs; [
     pkg-config
@@ -14,7 +23,7 @@ nixpkgs.rustPlatform.buildRustPackage {
     nix
   ];
 
-  cargoSha256 = "1bh8076ig9ssh8w44vyybswnn66xnfh28jsy6v9g5k6jmdlhr3qm";
+  cargoSha256 = "1xxjw94dfqimcf74gyaf4iqq99r1rsqp95imczfhpkx8kvf99xyn";
 
   meta = with nixpkgs.stdenv.lib; {
     description = "A source-based Nix documentation tool";
