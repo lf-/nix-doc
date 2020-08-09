@@ -23,6 +23,11 @@ impl AddPkg for cc::Build {
 }
 
 fn main() {
+    #[cfg(test)]
+    {
+        return;
+    }
+
     println!("cargo:rerun-if-changed=plugin.cpp");
     let nix_expr = pkg_config::Config::new()
         .atleast_version("2.1.1")

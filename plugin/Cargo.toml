@@ -5,6 +5,7 @@ edition = "2018"
 
 [lib]
 crate_type = ["cdylib"]
+test = false
 
 [build-dependencies]
 cc = "1.0.58"
