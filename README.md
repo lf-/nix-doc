@@ -186,6 +186,15 @@ $ nix-shell
 * Fix the dedent again. We are eating indents we should not be eating e.g. in
   the example above.
 
+## Related work
+
+- https://github.com/NixOS/nix/pull/1652: A PR implementing basically the same
+  thing as this tool's plugin in Nix itself, which has been deferred
+  indefinitely due to disagreements about what syntax to use in documentation
+  comments.
+- https://github.com/tazjin/nixdoc: A Rust tool producing DocBook documentation
+  for Nix library functions.
+
 ## Project information
 
 Everyone is expected to follow the [code of conduct](./CODE_OF_CONDUCT.md)
