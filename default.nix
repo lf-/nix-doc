@@ -1,34 +1,56 @@
-{ nixpkgs ? import <nixpkgs> { } }:
 let
-  gitignoreSrc = nixpkgs.fetchFromGitHub {
-      owner = "hercules-ci";
-      repo = "gitignore";
-      rev = "647d0821b590ee96056f4593640534542d8700e5";
-      sha256 = "sha256:0ks37vclz2jww9q0fvkk9jyhscw0ial8yx2fpakra994dm12yy1d";
-    };
-  inherit (import gitignoreSrc { inherit (nixpkgs) lib; }) gitignoreSource;
+  sources = import ./nix/sources.nix;
 in
-nixpkgs.rustPlatform.buildRustPackage {
-  pname   = "nix-doc";
-  version = "0.3.0";
+{ nixpkgs ? import <nixpkgs> }:
+let
+  pkgs = nixpkgs {
+    overlays = [
+      (import sources.nixpkgs-mozilla)
+      (self: super:
+        {
+          rustc = self.latest.rustChannels.stable.rust;
+          cargo = self.latest.rustChannels.stable.rust;
+        }
+      )
+    ];
+  };
+  inherit (import sources.gitignore { inherit (pkgs) lib; }) gitignoreSource;
+  naersk = pkgs.callPackage sources.naersk {};
+in
+naersk.buildPackage {
+  name   = "nix-doc";
+  version = "0.3.1";
 
   src = gitignoreSource ./.;
 
-  nativeBuildInputs = with nixpkgs; [
+  # I am about to commit a great crime against the rust stability policy:
+  # https://github.com/rust-lang/cargo/issues/6790
+  # has been unresolved for a long time and I don't want to use a nightly
+  # compiler
+  cargoBuild = def: "RUSTC_BOOTSTRAP=1 " + def;
+  # Poof, a squadron of angry Ferrises have been dispatched to my location and
+  # are about to attack me with their cute little clawbs
+
+  nativeBuildInputs = with pkgs; [
     pkg-config
   ];
 
-  buildInputs = with nixpkgs; [
+  buildInputs = with pkgs; [
     boost
     nix
   ];
 
-  cargoSha256 = "1xxjw94dfqimcf74gyaf4iqq99r1rsqp95imczfhpkx8kvf99xyn";
+  targets = [
+    "nix-doc"
+    "plugin"
+  ];
 
-  meta = with nixpkgs.stdenv.lib; {
-    description = "A source-based Nix documentation tool";
-    homepage    = "https://github.com/lf-/nix-doc";
-    license     = licenses.lgpl3Plus;
-    platforms   = platforms.all;
-  };
+  copyLibs = true;
+
+  # meta = with nixpkgs.stdenv.lib; {
+  #   description = "A source-based Nix documentation tool";
+  #   homepage    = "https://github.com/lf-/nix-doc";
+  #   license     = licenses.lgpl3Plus;
+  #   platforms   = platforms.all;
+  # };
 }
