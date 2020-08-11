@@ -161,6 +161,55 @@ func = autoArgs: fn: args: ...
 # /nix/store/nm5fxk0kzm3mlx1c22byfs4jizajwbk1-nixpkgs-20.09pre237349.f9f48250fe1/nixpkgs/lib/customisation.nix:117
 null
 ```
+## NixOS Installation
+
+To install the plugin system wide on NixOS, create a basic derivation for `nix-doc` called `default.nix`.
+
+```nix
+{ stdenv, rustPlatform, fetchFromGitHub, pkgs, ... }:
+
+rustPlatform.buildRustPackage rec {
+  pname = "nix-doc";
+  version = "v0.3.1";
+
+  src = fetchFromGitHub {
+    repo = pname;
+    owner = "lf-";
+    rev = version;
+    sha256 = "1hiz0fsbsl74m585llg2n359gs8i2m6jh8zdikkwxd8xq7qmw032";
+  };
+
+  buildInputs = with pkgs; [ boost nix ];
+
+  nativeBuildInputs = with pkgs; [ pkg-config ];
+
+  cargoSha256 = "1d1gvx14yai4dyz44pp2ffx2swfxnm0fwvldy96dw9gqmar69cpv";
+
+  meta = with stdenv.lib; {
+    homepage = url;
+    license = licenses.lgpl3;
+    description = "A Nix documentation lookup tool that quickly dumps the docs of the library function";
+  };
+}
+```
+
+Expose the package using the `configuration.nix` options in `/etc/nixos/configuration.nix`,
+where `../program/nixdoc/default.nix` is the path to the above derivation named `default.nix`.
+Link the plugin file using `nix.extraOptions`.
+
+```nix
+{ pkgs, ... }:
+
+{
+  nix.extraOptions = ''
+    plugin-files = ${pkgs.callPackage ../program/nixdoc/default.nix {}}/lib/libnix_doc_plugin.so
+  '';
+
+  environment.systemPackages = with pkgs; [
+    (callPackage ../program/nixdoc/default.nix {})
+  ];
+}
+```
 
 ## Development
 
