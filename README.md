@@ -166,15 +166,16 @@ null
 To install the plugin system wide on NixOS, create a basic derivation for `nix-doc` called `default.nix`.
 
 ```nix
-{ stdenv, rustPlatform, fetchgit, pkgs, ... }:
+{ stdenv, rustPlatform, fetchFromGitHub, pkgs, ... }:
 
 rustPlatform.buildRustPackage rec {
   pname = "nix-doc";
   version = "v0.3.1";
 
-  src = fetchgit {
+  src = fetchFromGitHub {
+    repo = pname;
+    owner = "lf-";
     rev = version;
-    url = "https://github.com/lf-/nix-doc.git";
     sha256 = "1hiz0fsbsl74m585llg2n359gs8i2m6jh8zdikkwxd8xq7qmw032";
   };
 
