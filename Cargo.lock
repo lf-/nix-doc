@@ -65,19 +65,18 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 
 [[package]]
 name = "nix-doc"
-version = "0.3.0"
+version = "0.3.3"
 dependencies = [
  "colorful",
  "num_cpus",
  "regex",
  "rnix",
- "textwrap",
  "walkdir",
 ]
 
 [[package]]
 name = "nix-doc-plugin"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cc",
  "nix-doc",
@@ -177,15 +176,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20431e104bfecc1a40872578dbc390e10290a0e9c35fffe3ce6f73c15a9dbfc2"
 
 [[package]]
-name = "textwrap"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "203008d98caf094106cfaba70acfed15e18ed3ddb7d94e49baec153a2b462789"
-dependencies = [
- "unicode-width",
-]
-
-[[package]]
 name = "thin-dst"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -199,12 +189,6 @@ checksum = "d40c6d1b69745a6ec6fb1ca717914848da4b44ae29d9b3080cbee91d72a69b14"
 dependencies = [
  "lazy_static",
 ]
-
-[[package]]
-name = "unicode-width"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9337591893a19b88d8d87f2cec1e73fad5cdfd10e5a6f349f498ad6ea2ffb1e3"
 
 [[package]]
 name = "walkdir"

@@ -149,69 +149,28 @@ Welcome to Nix version 2.3.7. Type :? for help.
 nix-repl> n=import <nixpkgs> {}
 
 nix-repl> builtins.doc n.lib.callPackageWith
-   `overrideDerivation drv f' takes a derivation (i.e., the result
-   of a call to the builtin function `derivation') and returns a new
-   derivation in which the attributes of the original are overridden
-   according to the function `f'.  The function `f' is called with
-   the original derivation attributes.
-
-   `overrideDerivation' allows certain "ad-hoc" customisation
-   scenarios (e.g. in ~/.config/nixpkgs/config.nix).  For instance,
-   if you want to "patch" the derivation returned by a package
-   function in Nixpkgs to build another version than what the
-   function itself provides, you can do something like this:
-
-   mySed = overrideDerivation pkgs.gnused (oldAttrs: {
-   name = "sed-4.2.2-pre";
-   src = fetchurl {
-   url = ftp://alpha.gnu.org/gnu/sed/sed-4.2.2-pre.tar.bz2;
-   sha256 = "11nq06d131y4wmf3drm0yk502d2xc6n5qy82cg88rb9nqd2lj41k";
-   };
-   patches = [];
-   });
-
-   For another application, see build-support/vm, where this
-   function is used to build arbitrary derivations inside a QEMU
-   virtual machine.
-   `makeOverridable` takes a function from attribute set to attribute set and
-   injects `override` attribute which can be used to override arguments of
-   the function.
-
-   nix-repl> x = {a, b}: { result = a + b; }
-
-   nix-repl> y = lib.makeOverridable x { a = 1; b = 2; }
-
-   nix-repl> y
-   { override = «lambda»; overrideDerivation = «lambda»; result = 3; }
-
-   nix-repl> y.override { a = 10; }
-   { override = «lambda»; overrideDerivation = «lambda»; result = 12; }
-
-   Please refer to "Nixpkgs Contributors Guide" section
-   "<pkg>.overrideDerivation" to learn about `overrideDerivation` and caveats
-   related to its use.
    Call the package function in the file `fn' with the required
    arguments automatically.  The function is called with the
    arguments `args', but any missing arguments are obtained from
    `autoArgs'.  This function is intended to be partially
    parameterised, e.g.,
 
-   callPackage = callPackageWith pkgs;
-   pkgs = {
-   libfoo = callPackage ./foo.nix { };
-   libbar = callPackage ./bar.nix { };
-   };
+     callPackage = callPackageWith pkgs;
+     pkgs = {
+       libfoo = callPackage ./foo.nix { };
+       libbar = callPackage ./bar.nix { };
+     };
 
    If the `libbar' function expects an argument named `libfoo', it is
    automatically passed as an argument.  Overrides or missing
    arguments can be supplied in `args', e.g.
 
-   libbar = callPackage ./bar.nix {
-   libfoo = null;
-   enableX11 = true;
-   };
+     libbar = callPackage ./bar.nix {
+       libfoo = null;
+       enableX11 = true;
+     };
 func = autoArgs: fn: args: ...
-# /nix/store/nm5fxk0kzm3mlx1c22byfs4jizajwbk1-nixpkgs-20.09pre237349.f9f48250fe1/nixpkgs/lib/customisation.nix:117
+# /nix/store/frpij1x0ihnyc4r5f7v0zxwpslkq6s27-nixpkgs-20.09pre237807.0dc87c6e54f/nixpkgs/lib/customisation.nix:117
 null
 ```
 
@@ -236,8 +195,6 @@ $ nix-shell
 
 * Generate tags files/otherwise generate a database file to speed up result
   generation.
-* Fix the dedent again. We are eating indents we should not be eating e.g. in
-  the example above.
 
 ## Related work
 

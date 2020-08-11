@@ -19,7 +19,7 @@ let
 in
 naersk.buildPackage {
   name   = "nix-doc";
-  version = "0.3.1";
+  version = "0.3.3";
 
   src = gitignoreSource ./.;
 

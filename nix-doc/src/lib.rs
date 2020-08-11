@@ -12,13 +12,9 @@ use rnix::SyntaxKind::*;
 use rnix::{NodeOrToken, SyntaxNode, TextUnit, WalkEvent, AST};
 use walkdir::{DirEntry, WalkDir};
 
-use std::ffi::{CStr, CString};
 use std::fs;
 use std::iter;
-use std::os::raw::c_char;
-use std::panic;
 use std::path::Path;
-use std::ptr;
 use std::sync::mpsc::channel;
 use std::{fmt::Display, str};
 
@@ -202,12 +198,70 @@ fn indented(s: &str, indent: usize) -> String {
         .join("\n")
 }
 
+/// Cleans up a single line, erasing prefix single line comments but preserving indentation
+fn cleanup_single_line<'a>(s: &'a str) -> &'a str {
+    let mut cmt_new_start = 0;
+    for (idx, ch) in s.char_indices() {
+        // if we find a character, save the byte position after it as our new string start
+        if ch == '#' || ch == '*' {
+            cmt_new_start = idx + 1;
+            break;
+        }
+        // if, instead, we are on a line with no starting comment characters, leave it alone as it
+        // will be handled by dedent later
+        if !ch.is_whitespace() {
+            break;
+        }
+    }
+    &s[cmt_new_start..]
+}
+
+/// Erases indents in comments. This is *almost* a normal dedent function, but it starts by looking
+/// at the second line if it can.
+fn dedent_comment(s: &str) -> String {
+    let mut whitespaces = 0;
+    let mut lines = s.lines();
+    let first = lines.next();
+
+    // scan for whitespace
+    for line in lines.chain(first) {
+        let line_whitespace = line.chars().take_while(|ch| ch.is_whitespace()).count();
+
+        if line_whitespace != line.len() {
+            // a non-whitespace line, perfect for taking whitespace off of
+            whitespaces = line_whitespace;
+            break;
+        }
+    }
+
+    // maybe the first considered line we found was indented further, so let's look for more lines
+    // that might have a shorter indent. In the case of one line, do nothing.
+    for line in s.lines().skip(1) {
+        let line_whitespace = line.chars().take_while(|ch| ch.is_whitespace()).count();
+
+        if line_whitespace != line.len() {
+            whitespaces = line_whitespace.min(whitespaces);
+        }
+    }
+
+    // delete up to `whitespaces` whitespace characters from each line and reconstitute the string
+    let mut out = String::new();
+    for line in s.lines() {
+        let content_begin = line.find(|ch: char| !ch.is_whitespace()).unwrap_or(0);
+        out.push_str(&line[content_begin.min(whitespaces)..]);
+        out.push('\n');
+    }
+
+    out.truncate(out.trim_end_matches('\n').len());
+    out
+}
+
 /// Deletes whitespace and leading comment characters
 ///
 /// Oversight we are choosing to ignore: if you put # characters at the beginning of lines in a
 /// multiline comment, they will be deleted.
 fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &mut I) -> String {
-    textwrap::dedent(
+    dedent_comment(
         &comment
             .rev()
             .map(|small_comment| {
@@ -224,11 +278,8 @@ fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &m
                     // extra space that was in the multiline
                     .trim()
                     .split('\n')
-                    .map(|line| {
-                        // leading whitespace + single line comments
-                        line.trim_start_matches(|c: char| c.is_whitespace())
-                            .trim_start_matches(|c: char| c == '#' || c == '*')
-                    })
+                    // erase single line comments and such
+                    .map(cleanup_single_line)
                     .collect::<Vec<_>>()
                     .join("\n")
             })
@@ -237,43 +288,8 @@ fn cleanup_comments<S: AsRef<str>, I: DoubleEndedIterator<Item = S>>(comment: &m
     )
 }
 
-/// Get the docs for a function in the given file path at the given file position and return it as
-/// a C string pointer
-#[no_mangle]
-pub extern "C" fn nd_get_function_docs(
-    filename: *const c_char,
-    line: usize,
-    col: usize,
-) -> *const c_char {
-    let fname = unsafe { CStr::from_ptr(filename) };
-    fname
-        .to_str()
-        .ok()
-        .and_then(|f| {
-            panic::catch_unwind(|| get_function_docs(f, line, col))
-                .map_err(|e| {
-                    eprintln!("panic!! {:#?}", e);
-                    e
-                })
-                .ok()
-        })
-        .flatten()
-        .and_then(|s| CString::new(s).ok())
-        .map(|s| s.into_raw() as *const c_char)
-        .unwrap_or(ptr::null())
-}
-
-/// Call this to free a string from nd_get_function_docs
-#[no_mangle]
-pub extern "C" fn nd_free_string(s: *const c_char) {
-    unsafe {
-        // this is maybe UB, but it is immediately dropped.
-        CString::from_raw(s as *mut c_char);
-    }
-}
-
 /// Get the docs for a specific function
-fn get_function_docs(filename: &str, line: usize, col: usize) -> Option<String> {
+pub fn get_function_docs(filename: &str, line: usize, col: usize) -> Option<String> {
     let content = fs::read(filename).ok()?;
     let decoded = str::from_utf8(&content).ok()?;
     let pos = find_pos(&decoded, line, col);
@@ -381,14 +397,34 @@ mod tests {
 
     #[test]
     fn test_comment_stripping() {
-        let ex1 = ["/* blah blah blah\n      foooo baaar\n */"];
+        let ex1 = ["/* blah blah blah\n      foooo baaar\n   blah */"];
         assert_eq!(
             cleanup_comments(&mut ex1.iter()),
-            "blah blah blah\nfoooo baaar"
+            "blah blah blah\n   foooo baaar\nblah"
         );
 
         let ex2 = ["# a1", "#    a2", "# aa"];
         assert_eq!(cleanup_comments(&mut ex2.iter()), "aa\n   a2\na1");
+    }
+
+    #[test]
+    fn test_dedent() {
+        let ex1 = "a\n   b\n   c\n     d";
+        assert_eq!(dedent_comment(ex1), "a\nb\nc\n  d");
+        let ex2 = "a\nb\nc";
+        assert_eq!(dedent_comment(ex2), ex2);
+        let ex3 = "   a\n   b\n\n     c";
+        assert_eq!(dedent_comment(ex3), "a\nb\n\n  c");
+    }
+
+    #[test]
+    fn test_single_line_comment_stripping() {
+        let ex1 = "    * a";
+        let ex2 = "    # a";
+        let ex3 = "   a";
+        assert_eq!(cleanup_single_line(ex1), " a");
+        assert_eq!(cleanup_single_line(ex2), " a");
+        assert_eq!(cleanup_single_line(ex3), ex3);
     }
 
     #[test]
@@ -402,8 +438,8 @@ requested length.
 Type: fixedWidthString :: int -> string -> string
 
 Example:
-fixedWidthString 5 "0" (toString 15)
-=> "00015""#;
+  fixedWidthString 5 "0" (toString 15)
+  => "00015""#;
         let ast = rnix::parse(include_str!("../testdata/regression-11.nix"))
             .as_result()
             .unwrap();
