@@ -192,7 +192,7 @@ rustPlatform.buildRustPackage rec {
 }
 ```
 
-Expose the package using the `configuration.nix` options,
+Expose the package using the `configuration.nix` options in `/etc/nixos/configuration.nix`,
 where `../program/nixdoc/default.nix` is the path to the above derivation named `default.nix`.
 Link the plugin file using `nix.extraOptions`.
 
