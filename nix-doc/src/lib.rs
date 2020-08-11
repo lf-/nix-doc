@@ -360,7 +360,7 @@ fn find_comment(node: SyntaxNode) -> Option<String> {
             },
             // This stuff is found as part of `the-fn = f: ...`
             // here:                           ^^^^^^^^
-            NODE_IDENT | NODE_KEY | NODE_KEY_VALUE | TOKEN_IDENT | TOKEN_ASSIGN => (),
+            NODE_KEY | TOKEN_ASSIGN => (),
             t if t.is_trivia() => (),
             _ => break,
         }
@@ -389,5 +389,27 @@ mod tests {
 
         let ex2 = ["# a1", "#    a2", "# aa"];
         assert_eq!(cleanup_comments(&mut ex2.iter()), "aa\n   a2\na1");
+    }
+
+    #[test]
+    fn test_regression_11() {
+        let out = r#"Create a fixed width string with additional prefix to match
+required width.
+
+This function will fail if the input string is longer than the
+requested length.
+
+Type: fixedWidthString :: int -> string -> string
+
+Example:
+fixedWidthString 5 "0" (toString 15)
+=> "00015""#;
+        let ast = rnix::parse(include_str!("../testdata/regression-11.nix"))
+            .as_result()
+            .unwrap();
+        let results = search_ast(&regex::Regex::new("fixedWidthString").unwrap(), &ast);
+        assert_eq!(results.len(), 1);
+
+        assert_eq!(results[0].doc, out);
     }
 }
