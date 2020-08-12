@@ -13,6 +13,15 @@ $ nix-env -i -f https://github.com/lf-/nix-doc/archive/main.tar.gz
 $ cargo install nix-doc
 ```
 
+### Nix Plugin
+
+To install the Nix plugin, add this to your Nix config at
+`~/.config/nix/nix.conf` after installing `nix-doc` with `nix-env`:
+
+```
+plugin-files = /home/YOURUSERNAMEHERE/.nix-profile/lib/libnix_doc_plugin.so
+```
+
 ## NixOS Installation
 
 To install nix-doc and its plugin system-wide on NixOS, create a basic
@@ -66,14 +75,6 @@ path to the above `default.nix` file. Link the plugin file using
 }
 ```
 
-### Nix Plugin
-
-To install the Nix plugin, add this to your Nix config at
-`~/.config/nix/nix.conf` after installing `nix-doc` with `nix-env`:
-
-```
-plugin-files = /home/YOURUSERNAMEHERE/.nix-profile/lib/libnix_doc_plugin.so
-```
 
 ## Usage
 
