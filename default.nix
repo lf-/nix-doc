@@ -12,6 +12,10 @@ let
           cargo = self.latest.rustChannels.stable.rust;
         }
       )
+      # You can put an overlay for your dev version of nix here.
+      # This is not great UX. I am sorry. I am not sure how to do it better :(
+      # Maybe flakes.
+      # (import ../nix).overlay
     ];
   };
   inherit (import sources.gitignore { inherit (pkgs) lib; }) gitignoreSource;
@@ -19,7 +23,7 @@ let
 in
 naersk.buildPackage {
   name   = "nix-doc";
-  version = "0.3.3";
+  version = "0.4.0";
 
   src = gitignoreSource ./.;
 

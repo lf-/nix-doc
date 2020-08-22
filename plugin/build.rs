@@ -42,7 +42,10 @@ fn main() {
         .probe("nix-main")
         .unwrap();
 
-    cc::Build::new()
+    let nix_ver = nix_expr.version.clone();
+
+    let mut build = cc::Build::new();
+    build
         .cpp(true)
         .opt_level(2)
         .shared_flag(true)
@@ -50,6 +53,12 @@ fn main() {
         .add_pkg_config(nix_expr)
         .add_pkg_config(nix_store)
         .add_pkg_config(nix_main)
-        .file("plugin.cpp")
-        .compile("nix_doc_plugin.so");
+        .file("plugin.cpp");
+
+    // Indicate that we need to patch around an API change with macros
+    if nix_ver.chars().take(1).next().unwrap() >= '3' {
+        build.define("NIX_3_0_0", None);
+    }
+
+    build.compile("nix_doc_plugin.so");
 }
