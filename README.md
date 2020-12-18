@@ -46,7 +46,7 @@ rustPlatform.buildRustPackage rec {
 
   nativeBuildInputs = with pkgs; [ pkg-config ];
 
-  cargoSha256 = "1d1gvx14yai4dyz44pp2ffx2swfxnm0fwvldy96dw9gqmar69cpv";
+  cargoSha256 = "06b36jv8hk4gqqm4nbh9gfszncvixs3zcjph45wlx7z5m61y9sdg";
 
   meta = with stdenv.lib; {
     homepage = url;
@@ -64,13 +64,17 @@ path to the above `default.nix` file. Link the plugin file using
 ```nix
 { pkgs, ... }:
 
+let
+  nix-doc = pkgs.callPackage ./program/nix-doc/default.nix {};
+in
+
 {
   nix.extraOptions = ''
-    plugin-files = ${pkgs.callPackage ../program/nixdoc/default.nix {}}/lib/libnix_doc_plugin.so
+    plugin-files = ${nix-doc}/lib/libnix_doc_plugin.so
   '';
 
   environment.systemPackages = with pkgs; [
-    (callPackage ../program/nixdoc/default.nix {})
+    nix-doc
   ];
 }
 ```
