@@ -7,7 +7,9 @@ from `nix repl` and a command line tool.
 ## Setup
 
 ```
-# installs both Nix plugin and command line tool
+# nix-doc is in nixpkgs
+$ nix-env -i nix-doc
+# you can also get it from git
 $ nix-env -i -f https://github.com/lf-/nix-doc/archive/main.tar.gz
 # or if you don't want to use nix, (only includes the command line tool)
 $ cargo install nix-doc
@@ -24,41 +26,7 @@ plugin-files = /home/YOURUSERNAMEHERE/.nix-profile/lib/libnix_doc_plugin.so
 
 ## NixOS Installation
 
-To install nix-doc and its plugin system-wide on NixOS, create a basic
-derivation for `nix-doc` in a `default.nix` file, for example, in
-`/etc/nixos/program/nix-doc/`:
-
-```nix
-{ stdenv, rustPlatform, fetchFromGitHub, pkgs, ... }:
-
-rustPlatform.buildRustPackage rec {
-  pname = "nix-doc";
-  version = "v0.3.1";
-
-  src = fetchFromGitHub {
-    repo = pname;
-    owner = "lf-";
-    rev = version;
-    sha256 = "1hiz0fsbsl74m585llg2n359gs8i2m6jh8zdikkwxd8xq7qmw032";
-  };
-
-  buildInputs = with pkgs; [ boost nix ];
-
-  nativeBuildInputs = with pkgs; [ pkg-config ];
-
-  cargoSha256 = "1d1gvx14yai4dyz44pp2ffx2swfxnm0fwvldy96dw9gqmar69cpv";
-
-  meta = with stdenv.lib; {
-    homepage = url;
-    license = licenses.lgpl3;
-    description = "A Nix documentation lookup tool that quickly dumps the docs of the library function";
-  };
-}
-```
-
-Expose the package using the following options in
-`/etc/nixos/configuration.nix`, where `../program/nix-doc/default.nix` is the
-path to the above `default.nix` file. Link the plugin file using
+Link the plugin file using
 `nix.extraOptions`:
 
 ```nix
@@ -66,11 +34,11 @@ path to the above `default.nix` file. Link the plugin file using
 
 {
   nix.extraOptions = ''
-    plugin-files = ${pkgs.callPackage ../program/nixdoc/default.nix {}}/lib/libnix_doc_plugin.so
+    plugin-files = ${pkgs.nix-doc}/lib/libnix_doc_plugin.so
   '';
 
   environment.systemPackages = with pkgs; [
-    (callPackage ../program/nixdoc/default.nix {})
+    nix-doc
   ];
 }
 ```
