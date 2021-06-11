@@ -3,37 +3,16 @@ let
 in
 { nixpkgs ? import <nixpkgs> }:
 let
-  pkgs = nixpkgs {
-    overlays = [
-      (import sources.nixpkgs-mozilla)
-      (self: super:
-        {
-          rustc = self.latest.rustChannels.stable.rust;
-          cargo = self.latest.rustChannels.stable.rust;
-        }
-      )
-      # You can put an overlay for your dev version of nix here.
-      # This is not great UX. I am sorry. I am not sure how to do it better :(
-      # Maybe flakes.
-      # (import ../nix).overlay
-    ];
-  };
+  pkgs = nixpkgs { };
   inherit (import sources.gitignore { inherit (pkgs) lib; }) gitignoreSource;
-  naersk = pkgs.callPackage sources.naersk {};
 in
-naersk.buildPackage {
-  name   = "nix-doc";
+pkgs.rustPlatform.buildRustPackage {
+  pname   = "nix-doc";
   version = "0.4.0";
 
-  src = gitignoreSource ./.;
+  cargoSha256 = "1xhv72466yrv57nj2whmyh3km0bz19q9bhgsi1z476k3l18bq3vg";
 
-  # I am about to commit a great crime against the rust stability policy:
-  # https://github.com/rust-lang/cargo/issues/6790
-  # has been unresolved for a long time and I don't want to use a nightly
-  # compiler
-  cargoBuild = def: "RUSTC_BOOTSTRAP=1 " + def;
-  # Poof, a squadron of angry Ferrises have been dispatched to my location and
-  # are about to attack me with their cute little clawbs
+  src = gitignoreSource ./.;
 
   nativeBuildInputs = with pkgs; [
     pkg-config
@@ -43,13 +22,6 @@ naersk.buildPackage {
     boost
     nix
   ];
-
-  targets = [
-    "nix-doc"
-    "plugin"
-  ];
-
-  copyLibs = true;
 
   # meta = with nixpkgs.stdenv.lib; {
   #   description = "A source-based Nix documentation tool";

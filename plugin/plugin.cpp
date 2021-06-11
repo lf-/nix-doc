@@ -89,22 +89,3 @@ static RegisterPrimOp rp1("__getDoc", 1, prim_getDoc);
 static RegisterPrimOp rp2("__doc", 1, prim_printDoc);
 static RegisterPrimOp rp3("__unsafeGetLambdaPos", 1, prim_unsafeGetLambdaPos);
 
-// only include the :doc repl command if our nix supports it
-// https://github.com/NixOS/nix/pull/3934
-#if __has_include("repl.hh")
-#include "repl.hh"
-
-void replCmd(NixRepl & repl, string, string arg)
-{
-    Value v;
-    repl.evalString(arg, v);
-    // it has been evaluated now
-    // TODO: (pending nix-doc hacking), support non-function attributes
-    // We actually have all the info to use unsafeGetAttrPos (more or less) with
-    // nice syntax, but I don't think nix-doc can get docs for attributes
-    forceLambda(v, noPos);
-    printLambdaDocs(v);
-}
-
-static RegisterReplCmd rc1({"doc"}, "Get the `nix-doc` documentation for <expr>", replCmd, "<expr>");
-#endif
