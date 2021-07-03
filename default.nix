@@ -8,9 +8,9 @@ let
 in
 pkgs.rustPlatform.buildRustPackage {
   pname   = "nix-doc";
-  version = "0.4.0";
+  version = "0.5.0";
 
-  cargoSha256 = "1xhv72466yrv57nj2whmyh3km0bz19q9bhgsi1z476k3l18bq3vg";
+  cargoSha256 = "1mndcqjmyzb89cggyf5gpbq21igmligjyjb8848r6c4m95g7b7kc";
 
   src = gitignoreSource ./.;
 

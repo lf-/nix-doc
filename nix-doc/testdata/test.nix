@@ -9,4 +9,7 @@
    # has multiple
    # comments
    the-snd-fn = {b, /* doc */ c}: {};
+
+   # sorry...
+   a.b.c = a: 1;
  }

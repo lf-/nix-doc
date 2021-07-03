@@ -1,5 +1,6 @@
 //! library components of nix-doc
 pub mod pprint;
+pub mod tags;
 pub mod threadpool;
 
 use crate::pprint::pprint_args;
@@ -103,7 +104,7 @@ fn search_file(file: &Path, matching: &Regex) -> Result<Vec<(SearchResult, usize
 
 /// Is a file hidden or a unicode decode error?
 /// Let's not consider it.
-fn is_ignored(entry: &DirEntry) -> bool {
+pub fn is_ignored(entry: &DirEntry) -> bool {
     entry
         .file_name()
         .to_str()
