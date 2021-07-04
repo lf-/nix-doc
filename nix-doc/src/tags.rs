@@ -357,34 +357,42 @@ mod tests {
     };
 
     use super::*;
+    use expect_test::{expect, Expect};
 
-    #[test]
-    fn smoke() {
+    fn check(dir: PathBuf, expected: Expect) {
         let curdir = current_dir().unwrap();
 
-        let datadir = curdir.join("testdata");
-        println!("datadir: {}", &datadir.display());
-        set_current_dir(datadir).unwrap();
+        println!("datadir: {}", &dir.display());
+        set_current_dir(dir).unwrap();
         let mut out = Vec::new();
 
         run_on_dir(&PathBuf::from("."), &mut out).unwrap();
         let out_s = std::str::from_utf8(&out).unwrap();
         println!("{}", out_s);
 
-        assert_eq!(
-            out_s.trim(),
-            r#"
-c	test.nix	/^   a.b.c = a: 1;$/;"	f
-fixedWidthString	regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
-the-fn	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	f
-the-snd-fn	test.nix	/^   the-snd-fn = {b, /* doc */ c}: {};$/;"	f
-withFeature	regression-11.nix	/^  withFeature = with_: feat: "--${if with_ then "with" else "without"}-${feat}";$/;"	f
-withFeatureAs	regression-11.nix	/^  withFeatureAs = with_: feat: value: withFeature with_ feat + optionalString with_ "=${value}";$/;"	f
-y	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m
-z	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m
-"#.trim()
-        );
+        expected.assert_eq(out_s.trim());
 
         set_current_dir(curdir).unwrap();
+    }
+
+    #[test]
+    fn smoke() {
+        check(
+            PathBuf::from("testdata"),
+            expect![[r#"
+                !_TAG_FILE_FORMAT	2	/extended format/
+                !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+                !_TAG_FILE_ENCODING	utf-8	//
+                !_TAG_PROGRAM_NAME	nix-doc tags	//
+                !_TAG_PROGRAM_URL	https://github.com/lf-/nix-doc	//
+                c	test.nix	/^   a.b.c = a: 1;$/;"	f
+                fixedWidthString	regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
+                the-fn	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	f
+                the-snd-fn	test.nix	/^   the-snd-fn = {b, \/* doc *\/ c}: {};$/;"	f
+                withFeature	regression-11.nix	/^  withFeature = with_: feat: "--\${if with_ then "with" else "without"}-\${feat}";$/;"	f
+                withFeatureAs	regression-11.nix	/^  withFeatureAs = with_: feat: value: withFeature with_ feat + optionalString with_ "=\${value}";$/;"	f
+                y	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m
+                z	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m"#]],
+        );
     }
 }
