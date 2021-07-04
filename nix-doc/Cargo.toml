@@ -1,5 +1,4 @@
 [package]
-authors = ["lf- <lf-@users.noreply.github.com>"]
 description = "Nix documentation grepping tool"
 edition = "2018"
 name = "nix-doc"
