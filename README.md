@@ -1,27 +1,52 @@
 # nix-doc
 
-A Nix documentation search tool. This package provides two front ends for
-documentation lookup: a Nix plugin that allows access to documentation directly
-from `nix repl` and a command line tool.
+A Nix developer tool leveraging the `rnix` Nix parser for intelligent
+documentation search and tags generation.
+
+## Features
+
+* Nix plugin that adds a builtin that can display the signature and
+  documentation for a lambda object in a friendly format
+* Command line tool that searches Nix files in a directory for functions and
+  shows documentation for matching ones
+* Tags generator similar to `ctags` that can generate a vim compatible tags
+  file for Nix source
+* High performance, threaded implementation in Rust
 
 ## Setup
 
 ```
 # nix-doc is in nixpkgs
 $ nix-env -i nix-doc
-# you can also get it from git
+
+# you can alternatively get it from git
 $ nix-env -i -f https://github.com/lf-/nix-doc/archive/main.tar.gz
-# or if you don't want to use nix, (only includes the command line tool)
+
+# or if you don't want to use nix (only includes the command line tool for
+# search and tags)
 $ cargo install nix-doc
 ```
 
 ### Nix Plugin
 
-To install the Nix plugin, add this to your Nix config at
-`~/.config/nix/nix.conf` after installing `nix-doc` with `nix-env`:
+To install the Nix plugin on a single-user installation of Nix, add this to
+your Nix config at `~/.config/nix/nix.conf` after installing `nix-doc` with
+`nix-env`:
 
 ```
 plugin-files = /home/YOURUSERNAMEHERE/.nix-profile/lib/libnix_doc_plugin.so
+```
+
+For a multi-user installation, you will need to do something like this:
+
+```
+$ sudo ln -s $(nix-build '<nixpkgs>' -A nix-doc) /opt/nix-doc
+```
+
+and then put this into your `/etc/nix/nix.conf`:
+
+```
+plugin-files = /opt/nix-doc/lib/libnix_doc_plugin.so
 ```
 
 ## NixOS Installation
