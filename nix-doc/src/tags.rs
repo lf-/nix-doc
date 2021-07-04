@@ -359,7 +359,8 @@ mod tests {
     use super::*;
     use expect_test::{expect, Expect};
 
-    fn check(dir: PathBuf, expected: Expect) {
+    fn check(dir: &str, expected: Expect) {
+        let dir = PathBuf::from(dir);
         let curdir = current_dir().unwrap();
 
         println!("datadir: {}", &dir.display());
@@ -378,7 +379,7 @@ mod tests {
     #[test]
     fn smoke() {
         check(
-            PathBuf::from("testdata"),
+            "testdata",
             expect![[r#"
                 !_TAG_FILE_FORMAT	2	/extended format/
                 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/

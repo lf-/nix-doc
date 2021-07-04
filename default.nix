@@ -10,7 +10,7 @@ pkgs.rustPlatform.buildRustPackage {
   pname   = "nix-doc";
   version = "0.5.0";
 
-  cargoSha256 = "0jkn1rqiwjb8yr66h7mija5gkswvb379cc1wp6gq5dbb29ggxbj2";
+  cargoSha256 = "0xmw3fyic0fcg7a6z8dr3lv367bxqdhdrlrl2hhlz59xg5kq8b3f";
 
   src = gitignoreSource ./.;
 

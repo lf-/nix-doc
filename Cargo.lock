@@ -80,6 +80,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bca1619ff57dd7a56b58a8e25ef4199f123e78e503fe1653410350a1b98ae65"
 
 [[package]]
+name = "dissimilar"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc4b29f4b9bb94bf267d57269fd0706d343a160937108e9619fe380645428abb"
+
+[[package]]
+name = "expect-test"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2300477aab3a378f2ca00a4fbd4dc713654ab7ed790e4017493cb33656280633"
+dependencies = [
+ "dissimilar",
+ "once_cell",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -121,6 +137,7 @@ version = "0.5.0"
 dependencies = [
  "clap",
  "colorful",
+ "expect-test",
  "num_cpus",
  "pathdiff",
  "regex",
@@ -156,6 +173,12 @@ dependencies = [
  "hermit-abi",
  "libc",
 ]
+
+[[package]]
+name = "once_cell"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
 
 [[package]]
 name = "pathdiff"
