@@ -49,13 +49,32 @@ Link the plugin file using
 ### CLI
 
 ```
-nix-doc SearchRegex [Directory]
+nix-doc <command>
 ```
+
+#### `nix-doc tags [dir]`
+
+Generates a vim-compatible `tags` file in the current directory, for all nix
+script files below the directory `dir`.
+
+Example:
+
+```
+nixpkgs$ nix-doc tags
+
+nixpkgs$ file tags
+tags: Exuberant Ctags tag file, ASCII text, with very long lines (502)
+
+# opens vim to the function callCabal2nix
+nixpkgs$ vim -t callCabal2nix
+```
+
+#### `nix-doc search <regex> [dir]`
 
 Example output:
 
 ```
-nixpkgs$ nix-doc callPackage
+nixpkgs$ nix-doc search callPackage
    Call the package function in the file `fn' with the required
    arguments automatically.  The function is called with the
    arguments `args', but any missing arguments are obtained from
@@ -162,8 +181,7 @@ $ nix-shell
 
 ## TODO
 
-* Generate tags files/otherwise generate a database file to speed up result
-  generation.
+- Tech: should update rnix to the latest major.
 
 ## Related work
 
@@ -173,6 +191,9 @@ $ nix-shell
   comments.
 - https://github.com/tazjin/nixdoc: A Rust tool producing DocBook documentation
   for Nix library functions.
+- https://github.com/mlvzk/manix: An early fork of this tool with a stronger
+  focus on CLI usage, with support for indexing and faster search. By
+  comparison, their CLI is better, but they don't do tags or a Nix plugin.
 
 ## Project information
 
