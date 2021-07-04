@@ -1,6 +1,7 @@
 use std::env::current_dir;
-use std::io::Write;
+use std::fmt::Write;
 use std::sync::mpsc::channel;
+use std::time::Instant;
 use std::{
     fmt, fs, io,
     iter::FromIterator,
@@ -17,6 +18,59 @@ use walkdir::WalkDir;
 
 use crate::threadpool::ThreadPool;
 use crate::{is_ignored, is_searchable};
+
+const DEBUG_TIMERS: bool = false;
+
+struct Timer(Instant);
+impl Timer {
+    fn new() -> Self {
+        Self(Instant::now())
+    }
+
+    fn debug_print(&self, name: &str) {
+        if DEBUG_TIMERS {
+            let time = self.0.elapsed();
+            eprintln!(
+                "{}: {:0.4} ms",
+                name,
+                time.as_millis() as f64 + time.subsec_millis() as f64 / 1000.
+            );
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum MemoValue<T> {
+    Uncomputed,
+    Failed,
+    Value(T),
+}
+
+impl<T> Default for MemoValue<T> {
+    fn default() -> Self {
+        Self::Uncomputed
+    }
+}
+
+impl<T> MemoValue<T> {
+    fn get_or_compute<F>(&mut self, f: F) -> Option<&T>
+    where
+        F: FnOnce() -> Option<T>,
+    {
+        match self {
+            MemoValue::Uncomputed => {
+                *self = f().map(MemoValue::Value).unwrap_or(MemoValue::Failed);
+                if let MemoValue::Value(ref v) = self {
+                    Some(v)
+                } else {
+                    None
+                }
+            }
+            MemoValue::Failed => None,
+            MemoValue::Value(ref v) => Some(v),
+        }
+    }
+}
 
 enum Kind {
     Function,
@@ -68,22 +122,46 @@ impl fmt::Display for Kind {
     }
 }
 
+fn escape(a: &str) -> String {
+    let magics = ['\\', '/', '$', '^'];
+
+    let mut result = String::new();
+    for c in a.chars() {
+        if magics.contains(&c) {
+            result.push('\\');
+        }
+        result.push(c);
+    }
+    result
+}
+
 fn make_addr(a: &str) -> SmolStr {
     // FIXME: delete this cloned malarkey when we can tell everyone with old nixpkgs to go eat a
     // nixpkgs-unstable cookie
-    SmolStr::from_iter(["/^", &a.replace(r"\", r"\\"), "$/"].iter().cloned())
+    SmolStr::from_iter(["/^", &escape(a), "$/"].iter().cloned())
 }
 
 impl Tag {
-    fn to_string_relative_to(&self, paths: &[PathBuf], p: &Path) -> Option<String> {
-        let relpath = pathdiff::diff_paths(&paths[self.path.0], p)?;
-        Some(format!(
+    fn to_string_relative_to(
+        &self,
+        paths: &[PathBuf],
+        p: &Path,
+        memo: &mut Vec<MemoValue<PathBuf>>,
+        out: &mut String,
+    ) -> Option<()> {
+        let relpath =
+            memo[self.path.0].get_or_compute(|| pathdiff::diff_paths(&paths[self.path.0], p))?;
+
+        write!(
+            out,
             "{}\t{}\t{};\"\t{}",
             self.name,
             relpath.display(),
             make_addr(&self.addr),
             self.kind
-        ))
+        )
+        .ok()?;
+        Some(())
     }
 }
 
@@ -170,9 +248,38 @@ impl<'a> FileJob<'a> {
     }
 }
 
+/// Writes out the header of the tags file to the writer.
+fn write_header(mut writer: impl io::Write) -> Result<(), Error> {
+    /*
+    !_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+    !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+    !_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+    !_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+    !_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+    !_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+    !_TAG_PROC_CWD	/home/jade/co/neovim/	//
+    !_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+    !_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+    !_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+    !_TAG_PROGRAM_VERSION	5.9.0	/e70d5a8f3/
+         */
+    writeln!(writer, "!_TAG_FILE_FORMAT\t2\t/extended format/")?;
+    writeln!(
+        writer,
+        "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted, 2=foldcase/"
+    )?;
+    writeln!(writer, "!_TAG_FILE_ENCODING\tutf-8\t//")?;
+    writeln!(writer, "!_TAG_PROGRAM_NAME\tnix-doc tags\t//")?;
+    writeln!(
+        writer,
+        "!_TAG_PROGRAM_URL\thttps://github.com/lf-/nix-doc\t//"
+    )?;
+    Ok(())
+}
+
 /// Builds a tags database into the given writer with paths relative to the current directory, with
 /// the nix files in `dir`
-pub fn run_on_dir(dir: &Path, mut writer: impl Write) -> Result<(), Error> {
+pub fn run_on_dir(dir: &Path, mut writer: impl io::Write) -> Result<(), Error> {
     let pool = ThreadPool::default();
     let (tx, rx) = channel();
 
@@ -180,6 +287,7 @@ pub fn run_on_dir(dir: &Path, mut writer: impl Write) -> Result<(), Error> {
     let curdir = current_dir()?;
 
     //println!("searching {}", dir.display());
+    let walk_t = Timer::new();
     for direntry in WalkDir::new(dir)
         .into_iter()
         .filter_entry(|e| !is_ignored(e))
@@ -210,22 +318,33 @@ pub fn run_on_dir(dir: &Path, mut writer: impl Write) -> Result<(), Error> {
 
     drop(tx);
     pool.done();
+    walk_t.debug_print("walk time");
 
     let mut out = Vec::new();
     while let Ok(set) = rx.recv() {
         out.extend(set);
     }
 
+    let sort_t = Timer::new();
     out.sort_by(|e1, e2| e1.name.as_str().cmp(e2.name.as_str()));
+    sort_t.debug_print("final sort time");
+
+    let write_t = Timer::new();
+    write_header(&mut writer)?;
+
+    let mut memo = vec![MemoValue::Uncomputed; paths_interned.len()];
+    let mut out_s = String::new();
 
     for tag in out {
-        let tag = match tag.to_string_relative_to(&paths_interned, &curdir) {
-            Some(v) => v,
+        out_s.clear();
+        match tag.to_string_relative_to(&paths_interned, &curdir, &mut memo, &mut out_s) {
+            Some(_) => (),
             None => continue,
         };
-        writer.write(tag.as_bytes())?;
+        writer.write(out_s.as_bytes())?;
         writer.write(b"\n")?;
     }
+    write_t.debug_print("write time");
 
     Ok(())
 }
