@@ -19,6 +19,10 @@ fn main() {
 
     match op.as_str() {
         "dump" => {
+            println!("==========           ast           ==========");
+            println!("{}", parsed.root().dump());
+
+            println!("========== descendants_with_tokens ==========");
             for node in parsed.node().descendants_with_tokens() {
                 match node {
                     NodeOrToken::Node(n) => {

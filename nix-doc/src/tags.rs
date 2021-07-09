@@ -8,6 +8,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use rnix::types::Inherit;
+use rnix::SyntaxNode;
 use rnix::{
     types::{AttrSet, EntryHolder, Ident, TokenWrapper, TypedNode},
     SmolStr,
@@ -172,6 +174,18 @@ struct FileJob<'a> {
 }
 
 impl<'a> FileJob<'a> {
+    fn get_source_line(&self, node: &SyntaxNode) -> &str {
+        let defined_at_start = node.text_range().start().to_usize();
+        let prior = &self.source[..defined_at_start];
+        let line_start = prior.rfind('\n').unwrap_or(0);
+        let after = &self.source[defined_at_start..];
+        let line_end = after
+            .find('\n')
+            .unwrap_or(self.source.len() - defined_at_start);
+        let source_line = &self.source[line_start..defined_at_start + line_end];
+        source_line.strip_prefix('\n').unwrap_or(source_line)
+    }
+
     fn visit_attrset(&mut self, set: &AttrSet) {
         for ent in set.entries() {
             let tag = (|| {
@@ -183,15 +197,7 @@ impl<'a> FileJob<'a> {
                     _ => Kind::Member,
                 };
 
-                let defined_at_start = key.node().text_range().start().to_usize();
-                let prior = &self.source[..defined_at_start];
-                let line_start = prior.rfind('\n').unwrap_or(0);
-                let after = &self.source[defined_at_start..];
-                let line_end = after
-                    .find('\n')
-                    .unwrap_or(self.source.len() - defined_at_start);
-                let source_line = &self.source[line_start..defined_at_start + line_end];
-                let source_line = source_line.strip_prefix('\n').unwrap_or(source_line);
+                let source_line = self.get_source_line(key.node());
 
                 let ident = key.path().last().and_then(Ident::cast);
                 let ident_name = ident.as_ref().map(|id| id.as_str())?;
@@ -210,13 +216,29 @@ impl<'a> FileJob<'a> {
         }
     }
 
+    fn visit_inherit(&mut self, inh: &Inherit) {
+        for id in inh.idents() {
+            (|| {
+                let name = id.as_str();
+                self.results.push(Tag {
+                    name: name.into(),
+                    path: self.file.clone(),
+                    addr: self.get_source_line(id.node()).into(),
+                    kind: Kind::Member,
+                });
+            })();
+        }
+    }
+
     fn exec(&mut self, ast: &AST) {
         for evt in ast.node().preorder_with_tokens() {
             match evt {
                 rnix::WalkEvent::Enter(ent) => {
-                    if let Some(set) = ent.into_node().and_then(AttrSet::cast) {
-                        self.visit_attrset(&set);
-                    }
+                    ent.into_node().map(|n| match n.kind() {
+                        NODE_ATTR_SET => self.visit_attrset(&AttrSet::cast(n).unwrap()),
+                        NODE_INHERIT => self.visit_inherit(&Inherit::cast(n).unwrap()),
+                        _ => (),
+                    });
                 }
                 rnix::WalkEvent::Leave(_) => (),
             }
@@ -387,7 +409,10 @@ mod tests {
                 !_TAG_PROGRAM_NAME	nix-doc tags	//
                 !_TAG_PROGRAM_URL	https://github.com/lf-/nix-doc	//
                 c	test.nix	/^   a.b.c = a: 1;$/;"	f
+                ff	test.nix	/^   inherit ff;$/;"	m
                 fixedWidthString	regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
+                grub	test.nix	/^   inherit (n) grub hello;$/;"	m
+                hello	test.nix	/^   inherit (n) grub hello;$/;"	m
                 the-fn	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	f
                 the-snd-fn	test.nix	/^   the-snd-fn = {b, \/* doc *\/ c}: {};$/;"	f
                 withFeature	regression-11.nix	/^  withFeature = with_: feat: "--\${if with_ then "with" else "without"}-\${feat}";$/;"	f
