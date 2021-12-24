@@ -12,11 +12,6 @@
 
 #endif
 
-#ifdef NIX_3_0_0
-#define throwTypeError_ throwTypeError
-#define throwTypeError(msg, val, pos) throwTypeError_(pos, msg, val)
-#endif
-
 using namespace nix;
 
 extern "C" {
@@ -24,14 +19,25 @@ char const * nd_get_function_docs(char const * filename, size_t line, size_t col
 void nd_free_string(char const * str);
 }
 
+void forceLambda(Value & v, const Pos & pos)
+{
+#ifdef NIX_2_4_0
+    if (v.type() != nFunction) {
+        throwTypeError(pos, "%2%: value is %1% while a lambda was expected", v);
+    }
+#else
+    if (v.type != tLambda) {
+        throwTypeError("%2%: value is %1% while a lambda was expected", v, pos);
+    }
+#endif
+}
+
+
 /* Print documentation of the given lambda. */
 void prim_getDoc(EvalState & state, const nix::Pos & pos, Value * * args, Value & v)
 {
     /* ensure the argument is a function */
     state.forceValue(*args[0], pos);
-    if (args[0]->type != tLambda) {
-        throwTypeError("%2%: value is %1% while a lambda was expected", *args[0], pos);
-    }
 
     auto poz = args[0]->lambda.fun->pos;
     std::string const & file = poz.file;
@@ -57,13 +63,6 @@ void printLambdaDocs(Value & v)
 
 }
 
-void forceLambda(Value & v, const Pos & pos)
-{
-    if (v.type != tLambda) {
-        throwTypeError("%2%: value is %1% while a lambda was expected", v, pos);
-    }
-}
-
 /* Return documentation of the given lambda. */
 void prim_printDoc(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -82,7 +81,11 @@ void prim_unsafeGetLambdaPos(EvalState & state, const Pos & pos, Value * * args,
     state.forceValue(*args[0], pos);
     forceLambda(*args[0], pos);
 
+#ifdef NIX_2_4_0
+    state.mkPos(v, ptr{&args[0]->lambda.fun->pos});
+#else
     state.mkPos(v, &args[0]->lambda.fun->pos);
+#endif
 }
 
 static RegisterPrimOp rp1("__getDoc", 1, prim_getDoc);

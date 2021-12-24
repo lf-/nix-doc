@@ -55,9 +55,13 @@ fn main() {
         .add_pkg_config(nix_main)
         .file("plugin.cpp");
 
+    let mut parts = nix_ver.split('.').map(str::parse);
+    let major: u32 = parts.next().unwrap().unwrap();
+    let minor = parts.next().unwrap().unwrap();
+
     // Indicate that we need to patch around an API change with macros
-    if nix_ver.chars().take(1).next().unwrap() >= '3' {
-        build.define("NIX_3_0_0", None);
+    if (major, minor) >= (2, 4) {
+        build.define("NIX_2_4_0", None);
     }
 
     build.compile("nix_doc_plugin.so");
