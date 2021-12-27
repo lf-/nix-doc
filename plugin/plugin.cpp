@@ -22,7 +22,7 @@ void nd_free_string(char const * str);
 void forceLambda(Value & v, const Pos & pos)
 {
 #ifdef NIX_2_4_0
-    if (v.type() != nFunction) {
+    if (!v.isLambda()) {
         throwTypeError(pos, "%2%: value is %1% while a lambda was expected", v);
     }
 #else
@@ -38,6 +38,7 @@ void prim_getDoc(EvalState & state, const nix::Pos & pos, Value * * args, Value 
 {
     /* ensure the argument is a function */
     state.forceValue(*args[0], pos);
+    forceLambda(*args[0], pos);
 
     auto poz = args[0]->lambda.fun->pos;
     std::string const & file = poz.file;
