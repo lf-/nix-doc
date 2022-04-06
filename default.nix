@@ -8,7 +8,7 @@ let
 in
 pkgs.rustPlatform.buildRustPackage {
   pname   = "nix-doc";
-  version = "0.5.2";
+  version = "0.5.3";
 
   cargoSha256 = "sha256-RxsH4bSAzBslK8MVGmCJxduf6MYOtQEKxt9QjgUCg1o=";
 

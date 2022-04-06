@@ -63,6 +63,9 @@ fn main() {
     if (major, minor) >= (2, 4) {
         build.define("NIX_2_4_0", None);
     }
+    if (major, minor) >= (2, 6) {
+        build.define("NIX_2_6_0", None);
+    }
 
     build.compile("nix_doc_plugin.so");
 }

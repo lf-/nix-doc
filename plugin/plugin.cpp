@@ -12,6 +12,26 @@
 
 #endif
 
+// i don't even know why i need these now, but i will need em eventually!
+namespace compat
+{
+void mkNull(nix::Value &v) {
+#ifdef NIX_2_6_0
+    v.mkNull();
+#else
+    nix::mkNull(v);
+#endif
+}
+
+void mkString(nix::Value &v, const char *s) {
+#ifdef NIX_2_6_0
+    v.mkString(s);
+#else
+    nix::mkString(v, s);
+#endif
+}
+}
+
 using namespace nix;
 
 extern "C" {
@@ -44,10 +64,10 @@ void prim_getDoc(EvalState & state, const nix::Pos & pos, Value * * args, Value 
     std::string const & file = poz.file;
     char const * doc = nd_get_function_docs(file.c_str(), poz.line, poz.column);
     if (doc == nullptr) {
-        mkNull(v);
+        compat::mkNull(v);
     } else {
         // this copies the string
-        mkString(v, doc);
+        compat::mkString(v, doc);
         nd_free_string(doc);
     }
 }
@@ -72,7 +92,7 @@ void prim_printDoc(EvalState & state, const Pos & pos, Value * * args, Value & v
     forceLambda(*args[0], pos);
 
     printLambdaDocs(*args[0]);
-    mkNull(v);
+    compat::mkNull(v);
 }
 
 /* Return position information of the given lambda. */

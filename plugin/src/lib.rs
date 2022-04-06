@@ -35,7 +35,8 @@ pub extern "C" fn nd_get_function_docs(
 #[no_mangle]
 pub extern "C" fn nd_free_string(s: *const c_char) {
     unsafe {
-        // this is maybe UB, but it is immediately dropped.
-        CString::from_raw(s as *mut c_char);
+        // cast note: this cast is turning something that was cast to const
+        // back to mut
+        drop(CString::from_raw(s as *mut c_char));
     }
 }
