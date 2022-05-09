@@ -24,7 +24,7 @@ $ nix-env -i -f https://github.com/lf-/nix-doc/archive/main.tar.gz
 
 # or if you don't want to use nix (only includes the command line tool for
 # search and tags)
-$ cargo install nix-doc
+$ cargo install --locked nix-doc
 ```
 
 ### Nix Plugin
