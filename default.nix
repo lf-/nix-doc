@@ -8,7 +8,7 @@ let
 in
 pkgs.rustPlatform.buildRustPackage {
   pname   = "nix-doc";
-  version = "0.5.4";
+  version = "0.5.5";
 
   cargoLock.lockFile = ./Cargo.lock;
 

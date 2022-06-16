@@ -2,7 +2,7 @@
 description = "Nix documentation grepping tool"
 edition = "2018"
 name = "nix-doc"
-version = "0.5.4"
+version = "0.5.5"
 license = "LGPL-3.0-or-later"
 homepage = "https://github.com/lf-/nix-doc"
 repository = "https://github.com/lf-/nix-doc"
