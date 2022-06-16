@@ -5,6 +5,10 @@ use std::ptr;
 
 use nix_doc::get_function_docs;
 
+extern "C" {
+    fn discourage_linker_from_discarding();
+}
+
 /// Get the docs for a function in the given file path at the given file position and return it as
 /// a C string pointer
 #[no_mangle]
@@ -13,6 +17,9 @@ pub extern "C" fn nd_get_function_docs(
     line: usize,
     col: usize,
 ) -> *const c_char {
+    unsafe {
+        discourage_linker_from_discarding();
+    }
     let fname = unsafe { CStr::from_ptr(filename) };
     fname
         .to_str()

@@ -14,9 +14,9 @@
 
 #include "compat.h"
 
-//
-
 using namespace nix;
+
+extern "C" void discourage_linker_from_discarding() {}
 
 extern "C" {
 char const *nd_get_function_docs(char const *filename, size_t line, size_t col);
