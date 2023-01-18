@@ -35,7 +35,7 @@ struct NdString {
 };
 
 NdString docs_for_pos(nix::Pos const &pos) {
-  std::string const &file = pos.file;
+  std::string const file = compat::fileForPos(pos);
   return NdString{nd_get_function_docs(file.c_str(), pos.line, pos.column)};
 }
 

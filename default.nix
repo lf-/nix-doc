@@ -8,7 +8,7 @@ let
 in
 pkgs.rustPlatform.buildRustPackage {
   pname   = "nix-doc";
-  version = "0.5.5";
+  version = "0.5.6";
 
   cargoLock.lockFile = ./Cargo.lock;
 
@@ -16,6 +16,7 @@ pkgs.rustPlatform.buildRustPackage {
 
   nativeBuildInputs = with pkgs; [
     pkg-config
+    nix
   ];
 
   buildInputs = with pkgs; [
