@@ -58,6 +58,8 @@ fn main() {
     let mut parts = nix_ver.split('.').map(str::parse);
     let major: u32 = parts.next().unwrap().unwrap();
     let minor = parts.next().unwrap().unwrap();
+    let patch = parts.next().map(|x| x.ok()).flatten().unwrap_or(0);
+    println!("Nix version: major={major} minor={minor} patch={patch}");
 
     // Indicate that we need to patch around an API change with macros
     if (major, minor) >= (2, 4) {
@@ -71,6 +73,9 @@ fn main() {
     }
     if (major, minor) >= (2, 13) {
         build.define("NIX_2_13_0", None);
+    }
+    if (major, minor, patch) >= (2, 13, 1) {
+        build.define("NIX_2_13_1", None);
     }
 
     build.compile("nix_doc_plugin.so");

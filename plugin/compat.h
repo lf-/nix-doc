@@ -53,7 +53,9 @@ inline void mkPos(nix::EvalState &state, nix::Value &v, compat::Pos pos) {
 inline void forceLambda(nix::EvalState &state, nix::Value &v,
                         compat::ConstPos pos) {
   // author's note: lol, lmao
-#if defined(NIX_2_13_0)
+  // bonus author's note: the above was written before 2.13.1 reverted the
+  // error builder. lol lmao.
+#if defined(NIX_2_13_0) && !defined(NIX_2_13_1)
   if (!v.isLambda()) {
     state.error("value is %1% while a lambda was expected", nix::showType(v))
         .withTrace(pos, "")
