@@ -77,6 +77,9 @@ fn main() {
     if (major, minor, patch) >= (2, 13, 1) {
         build.define("NIX_2_13_1", None);
     }
+    if (major, minor) >= (2, 14) {
+        build.define("NIX_2_14_0", None);
+    }
 
     build.compile("nix_doc_plugin.so");
 }

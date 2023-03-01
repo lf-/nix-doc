@@ -55,7 +55,9 @@ inline void forceLambda(nix::EvalState &state, nix::Value &v,
   // author's note: lol, lmao
   // bonus author's note: the above was written before 2.13.1 reverted the
   // error builder. lol lmao.
-#if defined(NIX_2_13_0) && !defined(NIX_2_13_1)
+  //
+  // it appears that it is back in 2.14.0.
+#if defined(NIX_2_14_0) || (defined(NIX_2_13_0) && !defined(NIX_2_13_1))
   if (!v.isLambda()) {
     state.error("value is %1% while a lambda was expected", nix::showType(v))
         .withTrace(pos, "")
