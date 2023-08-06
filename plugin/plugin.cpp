@@ -86,6 +86,6 @@ void prim_unsafeGetLambdaPos(EvalState &state, compat::ConstPos const pos,
   compat::mkPos(state, v, args[0]->lambda.fun->pos);
 }
 
-static RegisterPrimOp rp1("__getDoc", 1, prim_getDoc);
-static RegisterPrimOp rp2("__doc", 1, prim_printDoc);
-static RegisterPrimOp rp3("__unsafeGetLambdaPos", 1, prim_unsafeGetLambdaPos);
+static RegisterPrimOp rp1 = compat::mkPrimop("__getDoc", {"func"}, "Get the textual docs for a function", prim_getDoc);
+static RegisterPrimOp rp2 = compat::mkPrimop("__doc", {"func"}, "Print the docs for a function", prim_printDoc);
+static RegisterPrimOp rp3 = compat::mkPrimop("__unsafeGetLambdaPos", {"func"}, "Get the position of some lambda", prim_unsafeGetLambdaPos);

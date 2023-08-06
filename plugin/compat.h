@@ -1,6 +1,7 @@
 #include <cstring>
 #include <eval.hh>
 #include <nixexpr.hh>
+#include <primops.hh>
 #include <util.hh>
 #include <variant>
 
@@ -81,16 +82,44 @@ inline void forceLambda(nix::EvalState &state, nix::Value &v,
 #endif
 }
 
+#if defined(NIX_2_16_0)
+using SourcePathT = nix::SourcePath;
+inline auto sourcePathToString(SourcePathT p) -> std::string { return p.to_string(); };
+#else
+using SourcePathT = nix::Path;
+inline auto sourcePathToString(SourcePathT p) -> std::string { return std::string{p}; };
+#endif
+
 inline std::string fileForPos(nix::Pos const &pos) {
 #if defined(NIX_2_13_0)
   return std::visit(
       nix::overloaded{[](nix::Pos::none_tag) { return std::string{""}; },
                       [](nix::Pos::Stdin) { return std::string{""}; },
                       [](nix::Pos::String) { return std::string{""}; },
-                      [](nix::Path p) { return std::string{p}; }},
+                      [](SourcePathT p) { return sourcePathToString(p); }},
       pos.origin);
 #else
   return pos.file;
+#endif
+}
+
+inline nix::RegisterPrimOp
+mkPrimop(const std::string name, std::vector<std::string> args,
+         const char *docs,
+         void (*primop)(nix::EvalState &, ConstPos const pos, nix::Value **args,
+                        nix::Value &v)) {
+#if defined(NIX_2_17_0)
+  return nix::RegisterPrimOp((nix::PrimOp){
+      .name = name,
+      .args = args,
+      .arity = args.size(),
+      .doc = docs,
+      .fun = primop,
+      .experimentalFeature = {},
+  });
+#else
+  (void)docs;
+  return nix::RegisterPrimOp{name, args.size(), primop};
 #endif
 }
 

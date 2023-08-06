@@ -49,7 +49,7 @@ fn main() {
         .cpp(true)
         .opt_level(2)
         .shared_flag(true)
-        .flag("-std=c++17")
+        .flag("-std=c++20")
         .add_pkg_config(nix_expr)
         .add_pkg_config(nix_store)
         .add_pkg_config(nix_main)
@@ -79,6 +79,12 @@ fn main() {
     }
     if (major, minor) >= (2, 14) {
         build.define("NIX_2_14_0", None);
+    }
+    if (major, minor) >= (2, 16) {
+        build.define("NIX_2_16_0", None);
+    }
+    if (major, minor) >= (2, 17) {
+        build.define("NIX_2_17_0", None);
     }
 
     build.compile("nix_doc_plugin.so");
