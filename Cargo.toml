@@ -1,3 +1,6 @@
+[workspace.package]
+version = "0.5.9"
+
 [workspace]
 members = [
     "plugin",
