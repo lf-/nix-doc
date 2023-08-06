@@ -29,6 +29,7 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=plugin.cpp");
+
     let nix_expr = pkg_config::Config::new()
         .atleast_version("2.1.1")
         .probe("nix-expr")
@@ -53,6 +54,8 @@ fn main() {
         .add_pkg_config(nix_expr)
         .add_pkg_config(nix_store)
         .add_pkg_config(nix_main)
+        .cargo_metadata(true)
+        .link_lib_modifier("+whole-archive")
         .file("plugin.cpp");
 
     let mut parts = nix_ver.split('.').map(str::parse);
@@ -87,5 +90,5 @@ fn main() {
         build.define("NIX_2_17_0", None);
     }
 
-    build.compile("nix_doc_plugin.so");
+    build.compile("nix_doc_plugin");
 }
