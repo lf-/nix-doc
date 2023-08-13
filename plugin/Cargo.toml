@@ -1,6 +1,6 @@
 [package]
 name = "nix-doc-plugin"
-version = "0.5.9"
+version.workspace = true
 edition = "2018"
 
 [lib]
