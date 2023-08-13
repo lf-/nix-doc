@@ -54,6 +54,7 @@ fn main() {
         .add_pkg_config(nix_expr)
         .add_pkg_config(nix_store)
         .add_pkg_config(nix_main)
+        .define("BUILD_NIX_VERSION", Some(nix_ver.as_str()))
         .cargo_metadata(true)
         .link_lib_modifier("+whole-archive")
         .file("plugin.cpp");

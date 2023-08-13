@@ -8,7 +8,13 @@ let
     nativeBuildInputs = [
       pkg-config
     ];
-    buildInputs = [];
+    buildInputs = [ ];
+
+    # so that you can load a mismatched version of nix-doc safely
+    hardeningDisable = [ "relro" "bindnow" ];
+    RUSTFLAGS = "-Z relro-level=partial";
+    # this should have never been a -Z flag
+    RUSTC_BOOTSTRAP = "1";
   };
   cargoArtifacts = craneLib.buildDepsOnly args;
 

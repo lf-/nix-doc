@@ -38,6 +38,12 @@
             RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
             inputsFrom = [ p ];
 
+            # so that you can load a mismatched version of nix-doc safely
+            hardeningDisable = [ "relro" "bindnow" ];
+            RUSTFLAGS = "-Z relro-level=partial";
+            # this should have never been a -Z flag
+            RUSTC_BOOTSTRAP = "1";
+
             # any dev tools you use in excess of the rust ones
             nativeBuildInputs = with pkgs; [
               bear

@@ -14,9 +14,10 @@
 
 #include "compat.h"
 
-using namespace nix;
+#define stringify_2(s) #s
+#define stringify(s) stringify_2(s)
 
-extern "C" void discourage_linker_from_discarding() {}
+using namespace nix;
 
 extern "C" {
 char const *nd_get_function_docs(char const *filename, size_t line, size_t col);
@@ -86,6 +87,24 @@ void prim_unsafeGetLambdaPos(EvalState &state, compat::ConstPos const pos,
   compat::mkPos(state, v, args[0]->lambda.fun->pos);
 }
 
-static RegisterPrimOp rp1 = compat::mkPrimop("__getDoc", {"func"}, "Get the textual docs for a function", prim_getDoc);
-static RegisterPrimOp rp2 = compat::mkPrimop("__doc", {"func"}, "Print the docs for a function", prim_printDoc);
-static RegisterPrimOp rp3 = compat::mkPrimop("__unsafeGetLambdaPos", {"func"}, "Get the position of some lambda", prim_unsafeGetLambdaPos);
+static bool nix_version_matches() {
+  return stringify(BUILD_NIX_VERSION) == nixVersion;
+}
+
+static std::vector<RegisterPrimOp> registerPrimOps() {
+  if (!nix_version_matches()) {
+    std::cerr << "nix-doc warning: mismatched nix version, not loading\n";
+    return {};
+  }
+  return std::vector{
+      compat::mkPrimop("__getDoc", {"func"},
+                       "Get the textual docs for a function", prim_getDoc),
+      compat::mkPrimop("__doc", {"func"}, "Print the docs for a function",
+                       prim_printDoc),
+      compat::mkPrimop("__unsafeGetLambdaPos", {"func"},
+                       "Get the position of some lambda",
+                       prim_unsafeGetLambdaPos),
+  };
+}
+
+static std::vector<RegisterPrimOp> primops = registerPrimOps();
