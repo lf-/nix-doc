@@ -26,26 +26,25 @@
             nix = pkgs.nixVersions.${nixVer};
           };
 
-          versions = vs: builtins.listToAttrs (builtins.map (v: {
-            name = "nix-doc_${v}";
-            value = nix-doc-for "nix_${v}";
-          }) vs);
+          versions = vs: builtins.listToAttrs (builtins.map
+            (v: {
+              name = "nix-doc_${v}";
+              value = nix-doc-for "nix_${v}";
+            })
+            vs);
 
-          shellFor = p: p.overrideAttrs (
-            old: {
-              # make rust-analyzer work
-              RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
+          shellFor = p: pkgs.mkShell {
+            # make rust-analyzer work
+            RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
+            inputsFrom = [ p ];
 
-              # any dev tools you use in excess of the rust ones
-              nativeBuildInputs = old.nativeBuildInputs ++ (
-                with pkgs; [
-                  bear
-                  rust-analyzer
-                  clang-tools_14
-                ]
-              );
-            }
-          );
+            # any dev tools you use in excess of the rust ones
+            nativeBuildInputs = with pkgs; [
+              bear
+              rust-analyzer
+              clang-tools_14
+            ];
+          };
         in
         {
           packages = rec {
