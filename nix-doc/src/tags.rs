@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env::current_dir;
 use std::fmt::Write;
 use std::sync::mpsc::channel;
@@ -299,9 +300,26 @@ fn write_header(mut writer: impl io::Write) -> Result<(), Error> {
     Ok(())
 }
 
+/// Removes high-cardinality tags, since they are most likely useless.
+fn run_cardinality(max_cardinality: u32, data: &mut Vec<Tag>) {
+    let mut cardinalities = HashMap::new();
+
+    for tag in data.iter() {
+        // clone is O(1)
+        let cardinality = cardinalities.entry(tag.name.clone()).or_insert(0u32);
+        *cardinality += 1;
+    }
+
+    data.retain(|d| cardinalities[&d.name] <= max_cardinality);
+}
+
 /// Builds a tags database into the given writer with paths relative to the current directory, with
 /// the nix files in `dir`
-pub fn run_on_dir(dir: &Path, mut writer: impl io::Write) -> Result<(), Error> {
+pub fn run_on_dir(
+    dir: &Path,
+    max_cardinality: Option<u32>,
+    mut writer: impl io::Write,
+) -> Result<(), Error> {
     let pool = ThreadPool::default();
     let (tx, rx) = channel();
 
@@ -354,6 +372,10 @@ pub fn run_on_dir(dir: &Path, mut writer: impl io::Write) -> Result<(), Error> {
     let write_t = Timer::new();
     write_header(&mut writer)?;
 
+    if let Some(cardinality) = max_cardinality {
+        run_cardinality(cardinality, &mut out)
+    }
+
     let mut memo = vec![MemoValue::Uncomputed; paths_interned.len()];
     let mut out_s = String::new();
 
@@ -373,52 +395,76 @@ pub fn run_on_dir(dir: &Path, mut writer: impl io::Write) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        env::{current_dir, set_current_dir},
-        path::PathBuf,
-    };
+    use std::{env::current_dir, path::PathBuf};
 
     use super::*;
     use expect_test::{expect, Expect};
 
-    fn check(dir: &str, expected: Expect) {
-        let dir = PathBuf::from(dir);
+    fn check(dir: &str, max_cardinality: Option<u32>, expected: Expect) {
         let curdir = current_dir().unwrap();
+        let dir = curdir.join(PathBuf::from(dir));
 
         println!("datadir: {}", &dir.display());
-        set_current_dir(dir).unwrap();
+        println!("cwd: {:?}", &curdir);
         let mut out = Vec::new();
 
-        run_on_dir(&PathBuf::from("."), &mut out).unwrap();
+        run_on_dir(&PathBuf::from("."), max_cardinality, &mut out).unwrap();
         let out_s = std::str::from_utf8(&out).unwrap();
         println!("{}", out_s);
 
         expected.assert_eq(out_s.trim());
-
-        set_current_dir(curdir).unwrap();
     }
 
     #[test]
     fn smoke() {
         check(
             "testdata",
+            None,
             expect![[r#"
                 !_TAG_FILE_FORMAT	2	/extended format/
                 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
                 !_TAG_FILE_ENCODING	utf-8	//
                 !_TAG_PROGRAM_NAME	nix-doc tags	//
                 !_TAG_PROGRAM_URL	https://github.com/lf-/nix-doc	//
-                c	test.nix	/^   a.b.c = a: 1;$/;"	f
-                ff	test.nix	/^   inherit ff;$/;"	m
-                fixedWidthString	regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
-                grub	test.nix	/^   inherit (n) grub hello;$/;"	m
-                hello	test.nix	/^   inherit (n) grub hello;$/;"	m
-                the-fn	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	f
-                the-snd-fn	test.nix	/^   the-snd-fn = {b, \/* doc *\/ c}: {};$/;"	f
-                withFeature	regression-11.nix	/^  withFeature = with_: feat: "--\${if with_ then "with" else "without"}-\${feat}";$/;"	f
-                withFeatureAs	regression-11.nix	/^  withFeatureAs = with_: feat: value: withFeature with_ feat + optionalString with_ "=\${value}";$/;"	f
-                y	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m
-                z	test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m"#]],
+                c	testdata/test.nix	/^   a.b.c = a: 1;$/;"	f
+                ff	testdata/test.nix	/^   inherit ff;$/;"	m
+                fixedWidthString	testdata/regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
+                grub	testdata/test.nix	/^   inherit (n) grub hello;$/;"	m
+                hello	testdata/test.nix	/^   inherit (n) grub hello;$/;"	m
+                the-fn	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	f
+                the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
+                the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
+                the-snd-fn	testdata/test.nix	/^   the-snd-fn = {b, \/* doc *\/ c}: {};$/;"	f
+                withFeature	testdata/regression-11.nix	/^  withFeature = with_: feat: "--\${if with_ then "with" else "without"}-\${feat}";$/;"	f
+                withFeatureAs	testdata/regression-11.nix	/^  withFeatureAs = with_: feat: value: withFeature with_ feat + optionalString with_ "=\${value}";$/;"	f
+                x	testdata/test.nix	/^   x = {$/;"	m
+                y	testdata/test.nix	/^   y = {$/;"	m
+                y	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m
+                z	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m"#]],
+        );
+    }
+
+    #[test]
+    fn smoke_cardinality() {
+        check(
+            "testdata",
+            Some(1),
+            expect![[r#"
+                !_TAG_FILE_FORMAT	2	/extended format/
+                !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+                !_TAG_FILE_ENCODING	utf-8	//
+                !_TAG_PROGRAM_NAME	nix-doc tags	//
+                !_TAG_PROGRAM_URL	https://github.com/lf-/nix-doc	//
+                c	testdata/test.nix	/^   a.b.c = a: 1;$/;"	f
+                ff	testdata/test.nix	/^   inherit ff;$/;"	m
+                fixedWidthString	testdata/regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
+                grub	testdata/test.nix	/^   inherit (n) grub hello;$/;"	m
+                hello	testdata/test.nix	/^   inherit (n) grub hello;$/;"	m
+                the-snd-fn	testdata/test.nix	/^   the-snd-fn = {b, \/* doc *\/ c}: {};$/;"	f
+                withFeature	testdata/regression-11.nix	/^  withFeature = with_: feat: "--\${if with_ then "with" else "without"}-\${feat}";$/;"	f
+                withFeatureAs	testdata/regression-11.nix	/^  withFeatureAs = with_: feat: value: withFeature with_ feat + optionalString with_ "=\${value}";$/;"	f
+                x	testdata/test.nix	/^   x = {$/;"	m
+                z	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m"#]],
         );
     }
 }

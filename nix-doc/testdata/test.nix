@@ -16,6 +16,14 @@ in
    # sorry...
    a.b.c = a: 1;
 
+   x = {
+    the-fn = a: a;
+   };
+
+   y = {
+    the-fn = a: a;
+   };
+
    inherit (n) grub hello;
    inherit ff;
  }

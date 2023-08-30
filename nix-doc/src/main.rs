@@ -25,6 +25,13 @@ enum Args {
         /// The directory
         #[structopt(default_value = ".")]
         dir: PathBuf,
+
+        /// The maximum number of times to emit the same tag name. Avoids tags
+        /// such as "version" appearing uselessly a very large number of times.
+        ///
+        /// Pass -1 to disable this optimization.
+        #[structopt(long, default_value = "500")]
+        max_cardinality: i32,
     },
 }
 
@@ -37,7 +44,10 @@ fn main() -> Result<()> {
             search(&dir, re_match, is_searchable);
         }
 
-        Args::Tags { dir } => {
+        Args::Tags {
+            dir,
+            max_cardinality,
+        } => {
             let h = fs::OpenOptions::new()
                 .write(true)
                 .truncate(true)
@@ -45,7 +55,15 @@ fn main() -> Result<()> {
                 .open("tags")?;
             let mut h = BufWriter::new(h);
 
-            let res = tags::run_on_dir(&dir, &mut h);
+            let res = tags::run_on_dir(
+                &dir,
+                if max_cardinality >= 0 {
+                    Some(max_cardinality as u32)
+                } else {
+                    None
+                },
+                &mut h,
+            );
             if let Err(e) = res {
                 eprintln!("Failed while ctags'ing: {:?}", e);
             }
