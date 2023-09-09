@@ -2,7 +2,7 @@
 let n = import <nixpkgs> {};
     ff = 2;
 in
-{
+rec {
   /* This is a function blah blah
      with a long ass doc comment
    */
@@ -15,6 +15,10 @@ in
 
    # sorry...
    a.b.c = a: 1;
+
+   c = {
+    inherit the-fn;
+   };
 
    x = {
     the-fn = a: a;

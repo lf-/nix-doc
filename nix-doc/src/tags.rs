@@ -75,9 +75,28 @@ impl<T> MemoValue<T> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 enum Kind {
     Function,
     Member,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SyntacticKind {
+    Assign = 0,
+    Inherit = 1,
+}
+
+impl PartialOrd for SyntacticKind {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        (*self as u32).partial_cmp(&(*other as u32))
+    }
+}
+
+impl Ord for SyntacticKind {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
 }
 
 /// Path interned in an array of all the paths.
@@ -114,6 +133,9 @@ struct Tag {
 
     /// Kind of tag
     kind: Kind,
+
+    /// Syntactic type of the tag
+    syntactic: SyntacticKind,
 }
 
 impl fmt::Display for Kind {
@@ -208,6 +230,7 @@ impl<'a> FileJob<'a> {
                     path: self.file.clone(),
                     addr: source_line.into(),
                     kind,
+                    syntactic: SyntacticKind::Assign,
                 })
             })();
 
@@ -226,6 +249,7 @@ impl<'a> FileJob<'a> {
                     path: self.file.clone(),
                     addr: self.get_source_line(id.node()).into(),
                     kind: Kind::Member,
+                    syntactic: SyntacticKind::Inherit,
                 });
             })();
         }
@@ -265,7 +289,12 @@ impl<'a> FileJob<'a> {
 
         // we sort here because the rust sorting algo is supposedly good at a bunch of concatenated
         // sorted lists, and parallel compute is effectively free
-        results.sort_unstable_by(|e1, e2| e1.name.as_str().cmp(e2.name.as_str()));
+        results.sort_unstable_by(|e1, e2| {
+            e1.name
+                .as_str()
+                .cmp(e2.name.as_str())
+                .then_with(|| e1.syntactic.cmp(&e2.syntactic))
+        });
 
         Ok(results)
     }
@@ -427,6 +456,7 @@ mod tests {
                 !_TAG_PROGRAM_NAME	nix-doc tags	//
                 !_TAG_PROGRAM_URL	https://github.com/lf-/nix-doc	//
                 c	testdata/test.nix	/^   a.b.c = a: 1;$/;"	f
+                c	testdata/test.nix	/^   c = {$/;"	m
                 ff	testdata/test.nix	/^   inherit ff;$/;"	m
                 fixedWidthString	testdata/regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
                 grub	testdata/test.nix	/^   inherit (n) grub hello;$/;"	m
@@ -434,6 +464,7 @@ mod tests {
                 the-fn	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	f
                 the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
                 the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
+                the-fn	testdata/test.nix	/^    inherit the-fn;$/;"	m
                 the-snd-fn	testdata/test.nix	/^   the-snd-fn = {b, \/* doc *\/ c}: {};$/;"	f
                 withFeature	testdata/regression-11.nix	/^  withFeature = with_: feat: "--\${if with_ then "with" else "without"}-\${feat}";$/;"	f
                 withFeatureAs	testdata/regression-11.nix	/^  withFeatureAs = with_: feat: value: withFeature with_ feat + optionalString with_ "=\${value}";$/;"	f
@@ -455,7 +486,6 @@ mod tests {
                 !_TAG_FILE_ENCODING	utf-8	//
                 !_TAG_PROGRAM_NAME	nix-doc tags	//
                 !_TAG_PROGRAM_URL	https://github.com/lf-/nix-doc	//
-                c	testdata/test.nix	/^   a.b.c = a: 1;$/;"	f
                 ff	testdata/test.nix	/^   inherit ff;$/;"	m
                 fixedWidthString	testdata/regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
                 grub	testdata/test.nix	/^   inherit (n) grub hello;$/;"	m
