@@ -75,7 +75,7 @@ impl<T> MemoValue<T> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
     Function,
     Member,
@@ -100,7 +100,7 @@ impl Ord for SyntacticKind {
 }
 
 /// Path interned in an array of all the paths.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct InternedPath(usize);
 
 macro_rules! impl_from {
@@ -120,6 +120,7 @@ pub enum Error {
 
 impl_from!(Error, Io, io::Error);
 
+#[derive(PartialEq, Eq)]
 /// One ctags file entry
 struct Tag {
     /// Name of the identifier
@@ -136,6 +137,22 @@ struct Tag {
 
     /// Syntactic type of the tag
     syntactic: SyntacticKind,
+}
+
+impl PartialOrd for Tag {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(
+            self.name
+                .cmp(&other.name)
+                .then_with(|| self.syntactic.cmp(&other.syntactic)),
+        )
+    }
+}
+
+impl Ord for Tag {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
 }
 
 impl fmt::Display for Kind {
@@ -289,12 +306,7 @@ impl<'a> FileJob<'a> {
 
         // we sort here because the rust sorting algo is supposedly good at a bunch of concatenated
         // sorted lists, and parallel compute is effectively free
-        results.sort_unstable_by(|e1, e2| {
-            e1.name
-                .as_str()
-                .cmp(e2.name.as_str())
-                .then_with(|| e1.syntactic.cmp(&e2.syntactic))
-        });
+        results.sort_unstable();
 
         Ok(results)
     }
@@ -395,7 +407,7 @@ pub fn run_on_dir(
     }
 
     let sort_t = Timer::new();
-    out.sort_by(|e1, e2| e1.name.as_str().cmp(e2.name.as_str()));
+    out.sort_unstable();
     sort_t.debug_print("final sort time");
 
     let write_t = Timer::new();
@@ -464,6 +476,7 @@ mod tests {
                 the-fn	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	f
                 the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
                 the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
+                the-fn	testdata/test2.nix	/^  inherit the-fn;$/;"	m
                 the-fn	testdata/test.nix	/^    inherit the-fn;$/;"	m
                 the-snd-fn	testdata/test.nix	/^   the-snd-fn = {b, \/* doc *\/ c}: {};$/;"	f
                 withFeature	testdata/regression-11.nix	/^  withFeature = with_: feat: "--\${if with_ then "with" else "without"}-\${feat}";$/;"	f
