@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 use std::env::current_dir;
-use std::fmt::Write;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::time::Instant;
-use std::{
-    fmt, fs, io,
-    iter::FromIterator,
-    path::{Path, PathBuf},
-};
+use std::{fmt, fs, io, iter::FromIterator, path::Path};
 
 use rnix::types::Inherit;
 use rnix::SyntaxNode;
@@ -42,66 +38,17 @@ impl Timer {
     }
 }
 
-#[derive(Clone, Debug)]
-enum MemoValue<T> {
-    Uncomputed,
-    Failed,
-    Value(T),
-}
-
-impl<T> Default for MemoValue<T> {
-    fn default() -> Self {
-        Self::Uncomputed
-    }
-}
-
-impl<T> MemoValue<T> {
-    fn get_or_compute<F>(&mut self, f: F) -> Option<&T>
-    where
-        F: FnOnce() -> Option<T>,
-    {
-        match self {
-            MemoValue::Uncomputed => {
-                *self = f().map(MemoValue::Value).unwrap_or(MemoValue::Failed);
-                if let MemoValue::Value(ref v) = self {
-                    Some(v)
-                } else {
-                    None
-                }
-            }
-            MemoValue::Failed => None,
-            MemoValue::Value(ref v) => Some(v),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Kind {
-    Function,
-    Member,
+    Function = 0,
+    Member = 1,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum SyntacticKind {
     Assign = 0,
     Inherit = 1,
 }
-
-impl PartialOrd for SyntacticKind {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        (*self as u32).partial_cmp(&(*other as u32))
-    }
-}
-
-impl Ord for SyntacticKind {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
-    }
-}
-
-/// Path interned in an array of all the paths.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct InternedPath(usize);
 
 macro_rules! impl_from {
     ($on:ty, $variant:ident, $ty:ty) => {
@@ -127,7 +74,7 @@ struct Tag {
     name: SmolStr,
 
     /// Path relative to the tags file parent dir
-    path: InternedPath,
+    path: SmolStr,
 
     /// "address" of the tag, the line it's on, basically.
     addr: SmolStr,
@@ -144,7 +91,12 @@ impl PartialOrd for Tag {
         Some(
             self.name
                 .cmp(&other.name)
-                .then_with(|| self.syntactic.cmp(&other.syntactic)),
+                .then_with(|| self.syntactic.cmp(&other.syntactic))
+                .then_with(|| self.kind.cmp(&other.kind))
+                .then_with(|| self.path.cmp(&other.path))
+                // by the time we are comparing addr, we're really in the
+                // weeds.
+                .then_with(|| self.addr.cmp(&other.addr)),
         )
     }
 }
@@ -183,32 +135,21 @@ fn make_addr(a: &str) -> SmolStr {
     SmolStr::from_iter(["/^", &escape(a), "$/"].iter().cloned())
 }
 
-impl Tag {
-    fn to_string_relative_to(
-        &self,
-        paths: &[PathBuf],
-        p: &Path,
-        memo: &mut Vec<MemoValue<PathBuf>>,
-        out: &mut String,
-    ) -> Option<()> {
-        let relpath =
-            memo[self.path.0].get_or_compute(|| pathdiff::diff_paths(&paths[self.path.0], p))?;
-
+impl fmt::Display for Tag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
-            out,
+            f,
             "{}\t{}\t{};\"\t{}",
             self.name,
-            relpath.display(),
+            self.path,
             make_addr(&self.addr),
             self.kind
         )
-        .ok()?;
-        Some(())
     }
 }
 
 struct FileJob<'a> {
-    file: InternedPath,
+    file: SmolStr,
     source: &'a str,
     results: &'a mut Vec<Tag>,
 }
@@ -290,14 +231,14 @@ impl<'a> FileJob<'a> {
     /// Runs a file job collecting tags for a path.
     ///
     /// `p` must be absolute.
-    pub fn run(p_interned: InternedPath, p: &Path) -> Result<Vec<Tag>, Error> {
+    pub fn run(p: &Path, p_rel: SmolStr) -> Result<Vec<Tag>, Error> {
         assert!(p.is_absolute());
         let contents = fs::read_to_string(p)?;
         let parsed = rnix::parse(&contents);
         let mut results = Vec::new();
 
         let mut job = FileJob {
-            file: p_interned,
+            file: p_rel,
             source: &contents,
             results: &mut results,
         };
@@ -364,7 +305,6 @@ pub fn run_on_dir(
     let pool = ThreadPool::default();
     let (tx, rx) = channel();
 
-    let mut paths_interned = Vec::new();
     let curdir = current_dir()?;
 
     //println!("searching {}", dir.display());
@@ -376,17 +316,18 @@ pub fn run_on_dir(
         .filter(|e| is_searchable(e.path()) && e.path().is_file())
     {
         let path = curdir.join(direntry.into_path());
-        let path_ = path.clone();
-        paths_interned.push(path);
-        let path_interned = InternedPath(paths_interned.len() - 1);
+        let relpath = match pathdiff::diff_paths(&path, &curdir) {
+            Some(p) => Arc::new(p),
+            None => continue,
+        };
 
         let my_tx = tx.clone();
         pool.push(move || {
-            let results = FileJob::run(path_interned, &path_);
+            let results = FileJob::run(&path, SmolStr::from(relpath.display().to_string()));
             let results = match results {
                 Ok(v) => v,
                 Err(e) => {
-                    eprintln!("Error processing {}: {:?}", &path_.display(), e);
+                    eprintln!("Error processing {}: {:?}", &path.display(), e);
                     return;
                 }
             };
@@ -417,17 +358,8 @@ pub fn run_on_dir(
         run_cardinality(cardinality, &mut out)
     }
 
-    let mut memo = vec![MemoValue::Uncomputed; paths_interned.len()];
-    let mut out_s = String::new();
-
     for tag in out {
-        out_s.clear();
-        match tag.to_string_relative_to(&paths_interned, &curdir, &mut memo, &mut out_s) {
-            Some(_) => (),
-            None => continue,
-        };
-        writer.write(out_s.as_bytes())?;
-        writer.write(b"\n")?;
+        write!(&mut writer, "{}\n", tag)?;
     }
     write_t.debug_print("write time");
 
@@ -473,17 +405,17 @@ mod tests {
                 fixedWidthString	testdata/regression-11.nix	/^  fixedWidthString = width: filler: str:$/;"	f
                 grub	testdata/test.nix	/^   inherit (n) grub hello;$/;"	m
                 hello	testdata/test.nix	/^   inherit (n) grub hello;$/;"	m
+                the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
+                the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
                 the-fn	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	f
-                the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
-                the-fn	testdata/test.nix	/^    the-fn = a: a;$/;"	f
-                the-fn	testdata/test2.nix	/^  inherit the-fn;$/;"	m
                 the-fn	testdata/test.nix	/^    inherit the-fn;$/;"	m
+                the-fn	testdata/test2.nix	/^  inherit the-fn;$/;"	m
                 the-snd-fn	testdata/test.nix	/^   the-snd-fn = {b, \/* doc *\/ c}: {};$/;"	f
                 withFeature	testdata/regression-11.nix	/^  withFeature = with_: feat: "--\${if with_ then "with" else "without"}-\${feat}";$/;"	f
                 withFeatureAs	testdata/regression-11.nix	/^  withFeatureAs = with_: feat: value: withFeature with_ feat + optionalString with_ "=\${value}";$/;"	f
                 x	testdata/test.nix	/^   x = {$/;"	m
-                y	testdata/test.nix	/^   y = {$/;"	m
                 y	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m
+                y	testdata/test.nix	/^   y = {$/;"	m
                 z	testdata/test.nix	/^   the-fn = a: b: {z = a; y = b;};$/;"	m"#]],
         );
     }
