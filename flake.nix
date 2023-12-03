@@ -20,6 +20,7 @@
           pkgs = import nixpkgs {
             inherit system;
           };
+          inherit (pkgs) lib;
 
           nix-doc-for = nixVer: pkgs.callPackage ./package.nix {
             craneLib = crane.lib.${system};
@@ -38,18 +39,17 @@
             RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
             inputsFrom = [ p ];
 
+            # any dev tools you use in excess of the rust ones
+            nativeBuildInputs = with pkgs; [
+              rust-analyzer
+              clang-tools_14
+            ] ++ lib.optional pkgs.stdenv.isLinux pkgs.bear;
+          } // lib.optionalAttrs pkgs.stdenv.isLinux {
             # so that you can load a mismatched version of nix-doc safely
             hardeningDisable = [ "relro" "bindnow" ];
             RUSTFLAGS = "-Z relro-level=partial";
             # this should have never been a -Z flag
             RUSTC_BOOTSTRAP = "1";
-
-            # any dev tools you use in excess of the rust ones
-            nativeBuildInputs = with pkgs; [
-              bear
-              rust-analyzer
-              clang-tools_14
-            ];
           };
         in
         {
