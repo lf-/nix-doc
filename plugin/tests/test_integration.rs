@@ -38,7 +38,7 @@ fn nix_eval(expr: &str) -> String {
         .args(["--extra-experimental-features", "nix-command flakes"])
         .arg("--plugin-files")
         .arg(get_plugin_path())
-        .args(["eval", "--raw", "--impure"])
+        .args(["eval", "--raw", "--store", "dummy://", "--impure"])
         .arg("--expr")
         .arg(expr)
         .output()
