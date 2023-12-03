@@ -59,6 +59,17 @@ fn main() {
         .link_lib_modifier("+whole-archive")
         .file("plugin.cpp");
 
+    // For some ??? reason ??? linking fails if we don't link c++abi:
+    //  = note: Undefined symbols for architecture arm64:
+    //      "vtable for __cxxabiv1::__vmi_class_type_info", referenced from:
+    //          typeinfo for boost::wrapexcept<boost::io::bad_format_string> in libnix_doc_plugin.a(plugin.o)
+    //          typeinfo for boost::wrapexcept<boost::io::too_many_args> in libnix_doc_plugin.a(plugin.o)
+    //          typeinfo for boost::io::basic_oaltstringstream<char, std::__1::char_traits<char>, std::__1::allocator<char>> in libnix_doc_plugin.a(plugin.o)
+    #[cfg(target_os = "macos")]
+    {
+        println!("cargo:rustc-link-lib=c++abi");
+    }
+
     let mut parts = nix_ver.split('.').map(str::parse);
     let major: u32 = parts.next().unwrap().unwrap();
     let minor = parts.next().unwrap().unwrap();
