@@ -1,4 +1,4 @@
-{ craneLib, lib, pkg-config, nix, boost }:
+{ craneLib, lib, pkg-config, nix, boost, stdenv }:
 let
   src = lib.cleanSource ./.;
   args = {
@@ -9,7 +9,7 @@ let
       pkg-config
     ];
     buildInputs = [ ];
-
+  } // lib.optionalAttrs stdenv.isLinux {
     # so that you can load a mismatched version of nix-doc safely
     hardeningDisable = [ "relro" "bindnow" ];
     RUSTFLAGS = "-Z relro-level=partial";
