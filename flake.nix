@@ -5,9 +5,6 @@
     crane = {
       url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
-      # unused so break it
-      inputs.rust-overlay.follows = "flake-utils";
-      inputs.flake-utils.follows = "flake-utils";
     };
     flake-utils.url = "github:numtide/flake-utils";
   };
@@ -54,9 +51,11 @@
         in
         {
           packages = rec {
-            nix-doc = nix-doc-for "nix_2_17";
+            nix-doc = nix-doc-for "nix_2_19";
             default = nix-doc;
           } // versions [
+            "2_19"
+            "2_18"
             "2_17"
             "2_16"
             "2_15"
