@@ -101,6 +101,9 @@ fn main() {
     if (major, minor) >= (2, 17) {
         build.define("NIX_2_17_0", None);
     }
+    if (major, minor) >= (2, 20) {
+        build.define("NIX_2_20_0", None);
+    }
 
     build.compile("nix_doc_plugin");
 }

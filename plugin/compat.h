@@ -90,10 +90,17 @@ using SourcePathT = nix::Path;
 inline auto sourcePathToString(SourcePathT p) -> std::string { return std::string{p}; };
 #endif
 
+#if defined(NIX_2_20_0)
+using EmptyPos = std::monostate;
+#elif defined(NIX_2_13_0)
+using EmptyPos = nix::Pos::none_tag;
+#else
+#endif
+
 inline std::string fileForPos(nix::Pos const &pos) {
 #if defined(NIX_2_13_0)
   return std::visit(
-      nix::overloaded{[](nix::Pos::none_tag) { return std::string{""}; },
+      nix::overloaded{[](EmptyPos) { return std::string{""}; },
                       [](nix::Pos::Stdin) { return std::string{""}; },
                       [](nix::Pos::String) { return std::string{""}; },
                       [](SourcePathT p) { return sourcePathToString(p); }},
