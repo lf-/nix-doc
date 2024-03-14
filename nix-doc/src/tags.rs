@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Jade Lovelace
+//
+// SPDX-License-Identifier: BSD-2-Clause OR MIT
+
 use std::collections::HashMap;
 use std::env::current_dir;
 use std::sync::mpsc::channel;

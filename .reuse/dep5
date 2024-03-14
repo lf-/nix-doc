@@ -1,0 +1,13 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: nix-doc
+Upstream-Contact: Jade Lovelace <software@lfcode.ca>
+Source: https://github.com/lf-/nix-doc
+
+# Sample paragraph, commented out:
+#
+# Files: src/*
+# Copyright: $YEAR $NAME <$CONTACT>
+# License: ...
+Files: plugin/testdata/* nix-doc/testdata/*
+Copyright: 2024 Jade Lovelace
+License: BSD-2-Clause OR MIT

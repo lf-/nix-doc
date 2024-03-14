@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Jade Lovelace
+//
+// SPDX-License-Identifier: BSD-2-Clause OR MIT
+
 trait AddPkg {
     fn add_pkg_config(&mut self, pkg: pkg_config::Library) -> &mut Self;
 }

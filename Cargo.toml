@@ -1,5 +1,10 @@
+# SPDX-FileCopyrightText: 2024 Jade Lovelace
+#
+# SPDX-License-Identifier: BSD-2-Clause OR MIT
+
 [workspace.package]
 version = "0.6.5"
+license = "BSD-2-Clause OR MIT"
 
 [workspace]
 members = [

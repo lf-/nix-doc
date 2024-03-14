@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Jade Lovelace
+//
+// SPDX-License-Identifier: BSD-2-Clause OR MIT
+
 use std::env;
 use std::fs;
 use std::str;

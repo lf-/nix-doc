@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Jade Lovelace
+//
+// SPDX-License-Identifier: BSD-2-Clause OR MIT
+
 //! A nix documentation search program
 
 use nix_doc::{is_searchable, search, tags, Result};

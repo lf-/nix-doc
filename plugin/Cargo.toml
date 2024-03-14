@@ -1,6 +1,11 @@
+# SPDX-FileCopyrightText: 2024 Jade Lovelace
+#
+# SPDX-License-Identifier: BSD-2-Clause OR MIT
+
 [package]
 name = "nix-doc-plugin"
 version.workspace = true
+license.workspace = true
 edition = "2018"
 
 [lib]

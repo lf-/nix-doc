@@ -1,9 +1,13 @@
+# SPDX-FileCopyrightText: 2024 Jade Lovelace
+#
+# SPDX-License-Identifier: BSD-2-Clause OR MIT
+
 [package]
 description = "Nix documentation grepping tool"
 edition = "2018"
 name = "nix-doc"
 version.workspace = true
-license = "LGPL-3.0-or-later"
+license.workspace = true
 homepage = "https://github.com/lf-/nix-doc"
 repository = "https://github.com/lf-/nix-doc"
 

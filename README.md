@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2024 Jade Lovelace, 2022 tdro -->
+
 # nix-doc
 
 A Nix developer tool leveraging the `rnix` Nix parser for intelligent

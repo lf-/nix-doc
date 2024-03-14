@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Jade Lovelace
+//
+// SPDX-License-Identifier: BSD-2-Clause OR MIT
+
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::panic;
