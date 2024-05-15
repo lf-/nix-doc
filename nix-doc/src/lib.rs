@@ -206,9 +206,13 @@ fn indented(s: &str, indent: usize) -> String {
 /// Cleans up a single line, erasing prefix single line comments but preserving indentation
 fn cleanup_single_line<'a>(s: &'a str) -> &'a str {
     let mut cmt_new_start = 0;
-    for (idx, ch) in s.char_indices() {
+    let mut iter = s.char_indices().peekable();
+    while let Some((idx, ch)) = iter.next() {
+        // peek at the next character, with an explicit '\n' as "next character" at end of line
+        let (_, next_ch) = iter.peek().unwrap_or(&(0, '\n'));
+
         // if we find a character, save the byte position after it as our new string start
-        if ch == '#' || ch == '*' {
+        if ch == '#' || ch == '*' && next_ch.is_whitespace() {
             cmt_new_start = idx + 1;
             break;
         }
@@ -427,9 +431,17 @@ mod tests {
         let ex1 = "    * a";
         let ex2 = "    # a";
         let ex3 = "   a";
+        let ex4 = "   *";
         assert_eq!(cleanup_single_line(ex1), " a");
         assert_eq!(cleanup_single_line(ex2), " a");
         assert_eq!(cleanup_single_line(ex3), ex3);
+        assert_eq!(cleanup_single_line(ex4), "");
+    }
+
+    #[test]
+    fn test_single_line_retains_bold_headings() {
+        let ex1 = "   **Foo**:";
+        assert_eq!(cleanup_single_line(ex1), ex1);
     }
 
     #[test]
